@@ -58,34 +58,35 @@
   #trail {
     position: relative; height: 48px; margin-top: 8px;
   }
-  /* AHEAD of Remi: a faint dashed/dotted "route to walk" (the full-width base line) */
+  /* AHEAD of Remi (uncompleted): a visible muted dusty sand-trail — the whole route
+     to the oasis is always shown so it never reads as "nothing ahead". */
   #trailLine {
-    position: absolute; left: 0; right: 0; top: 38px; height: 2px; border-radius: 2px;
-    background: transparent;
-    /* low-opacity cream dashes = map route still to be walked */
-    background-image: repeating-linear-gradient(90deg,
-      rgba(246,242,231,.30) 0px, rgba(246,242,231,.30) 5px,
-      transparent 5px, transparent 12px);
+    position: absolute; left: 0; right: 0; top: 36px; height: 6px; border-radius: 3px;
+    background: rgba(246,233,200,.22);
+    box-shadow: inset 0 0 0 1px rgba(246,242,231,.12);
   }
-  /* BEHIND Remi: a solid warmer cream/sand traveled path that fills up to the walker */
+  /* BEHIND Remi (completed): a brighter WARM GOLD traveled path with footprint dots,
+     filling up to the walker. */
   #trailDone {
-    position: absolute; left: 0; top: 37px; width: 0%; height: 4px; border-radius: 3px;
-    background: linear-gradient(90deg, rgba(231,196,106,.55), rgba(246,233,200,.92));
-    box-shadow: 0 1px 4px rgba(0,0,0,.30);
-    /* small footprint marks along the traveled path */
+    position: absolute; left: 0; top: 36px; width: 0%; height: 6px; border-radius: 3px;
+    background: linear-gradient(90deg, rgba(231,196,106,.85), #e7c46a);
+    box-shadow: 0 1px 5px rgba(231,196,106,.45);
+    /* small footprint dots along the traveled path */
     background-image:
-      radial-gradient(circle, rgba(120,86,40,.45) 1.3px, transparent 1.7px),
-      linear-gradient(90deg, rgba(231,196,106,.55), rgba(246,233,200,.92));
-    background-size: 18px 4px, 100% 100%;
-    background-position: 5px center, center;
+      radial-gradient(circle, rgba(120,86,40,.5) 1.3px, transparent 1.7px),
+      linear-gradient(90deg, rgba(231,196,106,.85), #e7c46a);
+    background-size: 18px 6px, 100% 100%;
+    background-position: 6px center, center;
     background-repeat: repeat-x, no-repeat;
     transition: width .12s linear;
   }
-  /* tiny oasis/flag marker at the far (end) right of the route */
+  /* OASIS destination marker at the far (right) end of the route — a little palm */
   #trailFlag {
-    position: absolute; right: 6px; top: 30px; font-size: 13px; line-height: 1;
-    opacity: .8; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45));
+    position: absolute; right: 4px; top: 24px; font-size: 16px; line-height: 1;
+    opacity: .95; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5));
+    display: flex; align-items: center; justify-content: center;
   }
+  #trailFlag img { width: 22px; height: 22px; object-fit: contain; display: block; }
   #walker {
     position: absolute; bottom: 8px; left: 0%;
     transform: translateX(-50%);
@@ -320,6 +321,122 @@
     margin-top: 8px; background: none; border: none; box-shadow: none;
     color: rgba(255,255,255,.85); font-weight: 800; font-size: 14px; padding: 10px 12px;
   }
+
+  /* ============================================================
+     THE LAST SEED — oasis planting animation (full-screen showpiece)
+     ============================================================ */
+  #oasisScreen {
+    position: absolute; inset: 0; z-index: 25; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end; text-align: center;
+    overflow: hidden; cursor: pointer;
+    background:
+      radial-gradient(120% 70% at 50% 16%, rgba(189,255,233,.55), rgba(120,221,208,0) 60%),
+      linear-gradient(180deg, #bfffe9 0%, #7fe0cf 46%, #e7c98e 70%, #d8b06a 100%);
+  }
+  #oasisScreen.hidden { display: none; }
+  /* soft oasis ground band */
+  #oasisGround {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 34%;
+    background: linear-gradient(180deg, #e7c98e 0%, #cda35e 100%);
+    box-shadow: inset 0 6px 18px rgba(120,86,40,.18);
+  }
+  #oasisGround::before {
+    content: ''; position: absolute; left: 0; right: 0; top: -1px; height: 14px;
+    background: radial-gradient(circle at 50% 0, rgba(246,233,200,.6), transparent 70%);
+  }
+  /* the stacked plant stage — anchored at the soil line */
+  #oasisStage {
+    position: absolute; left: 50%; bottom: 30%;
+    transform: translateX(-50%);
+    width: 220px; height: 300px;
+    display: flex; align-items: flex-end; justify-content: center;
+    pointer-events: none; z-index: 2;
+  }
+  #oasisStage > * {
+    position: absolute; left: 50%; bottom: 0;
+    transform-origin: 50% 100%;
+  }
+  /* Remi kneeling, pressing the seed */
+  #plantRemi {
+    width: 150px; height: 150px; object-fit: contain;
+    transform: translateX(-50%) scale(.6);
+    opacity: 0;
+    filter: drop-shadow(0 8px 14px rgba(0,0,0,.3));
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  #plantRemi.in { opacity: 1; transform: translateX(-50%) scale(1); }
+  #plantRemi.out { opacity: 0; transition: opacity .6s ease; }
+  /* glowing seed pulse */
+  #plantSeed {
+    width: 18px; height: 18px; border-radius: 50%;
+    bottom: 26px; transform: translateX(-50%) scale(.4); opacity: 0;
+    background: radial-gradient(circle at 40% 35%, #fff7c8, #e7c46a 60%, #b98a30);
+    box-shadow: 0 0 18px 6px rgba(231,196,106,.75);
+  }
+  #plantSeed.in { opacity: 1; animation: seedPulse 1s ease-in-out infinite; }
+  @keyframes seedPulse {
+    0%,100% { transform: translateX(-50%) scale(.9); box-shadow: 0 0 16px 5px rgba(231,196,106,.6); }
+    50%     { transform: translateX(-50%) scale(1.15); box-shadow: 0 0 26px 10px rgba(231,196,106,.95); }
+  }
+  #plantSeed.out { opacity: 0; transition: opacity .35s ease; }
+  /* sprout pops with a gentle bounce */
+  #plantSprout {
+    width: 64px; height: 80px; object-fit: contain;
+    transform: translateX(-50%) scale(0); opacity: 0;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,.22));
+  }
+  #plantSprout.pop {
+    opacity: 1;
+    animation: sproutPop .7s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+  @keyframes sproutPop {
+    0%   { transform: translateX(-50%) scale(0); opacity: 0; }
+    60%  { transform: translateX(-50%) scale(1.18); opacity: 1; }
+    100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  }
+  #plantSprout.fade { opacity: 0; transition: opacity .8s ease; }
+  /* palm grows upward from the sprout base to full */
+  #plantPalm {
+    width: 200px; height: 240px; object-fit: contain;
+    transform: translateX(-50%) scale(.14); opacity: 0;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,.32));
+    transition: transform 1.5s cubic-bezier(.22,.61,.36,1), opacity .9s ease;
+  }
+  #plantPalm.grow { transform: translateX(-50%) scale(1); opacity: 1; }
+
+  #oasisText {
+    position: relative; z-index: 3; margin-bottom: calc(34% + 18px);
+    opacity: 0; transform: translateY(8px); transition: opacity .6s ease, transform .6s ease;
+    pointer-events: none;
+  }
+  #oasisText.show { opacity: 1; transform: translateY(0); }
+  #oasisTitle {
+    font-family: var(--serif); font-size: 32px; font-weight: 600; letter-spacing: .5px;
+    color: #06403d; text-shadow: 0 2px 10px rgba(255,255,255,.55);
+  }
+  #oasisSub {
+    font-family: var(--serif); font-size: 17px; font-style: italic; margin-top: 4px;
+    color: #0a6a5e; text-shadow: 0 1px 6px rgba(255,255,255,.5);
+  }
+  #oasisHint {
+    position: absolute; left: 0; right: 0; bottom: 22px; z-index: 3;
+    font-size: 12px; letter-spacing: 1px; color: rgba(6,64,61,.6);
+    opacity: 0; transition: opacity .6s ease;
+  }
+  #oasisHint.show { opacity: 1; }
+
+  /* ============================================================
+     YOUR GROVE — lifetime stats panel
+     ============================================================ */
+  #groveScreen { z-index: 16; }
+  .grove-rows { display: flex; flex-direction: column; gap: 2px; width: 100%; margin-top: 6px; }
+  .grove-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 4px; border-bottom: 1px solid rgba(246,242,231,.12);
+  }
+  .grove-row:last-child { border-bottom: none; }
+  .grove-row .gl { font-size: 14px; opacity: .8; display: flex; align-items: center; gap: 8px; }
+  .grove-row .gv { font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--cream); }
 </style>
 </head>
 <body>
@@ -335,7 +452,7 @@
       <div id="trail">
         <div id="trailLine"></div>
         <div id="trailDone"></div>
-        <div id="trailFlag">🚩</div>
+        <div id="trailFlag"><img src="assets/palm.png" alt="" onerror="this.outerHTML='🌴'"></div>
         <div id="walker"><img id="walkerImg" src="assets/remi_walk.png" alt="" onerror="this.outerHTML='🥾'"></div>
       </div>
     </div>
@@ -381,6 +498,8 @@
       <div class="linkrow">
         <button id="replayIntroBtn" class="textbtn">Replay intro</button>
         <span class="sep">·</span>
+        <button id="groveStartBtn" class="textbtn">🌴 Your Grove</button>
+        <span class="sep">·</span>
         <button id="lbStartBtn" class="textbtn">🏆 Leaderboard</button>
       </div>
       <div class="hint">Drag to move · tap the badge for speed · keys ← → F 1–4 M</div>
@@ -394,6 +513,7 @@
       <div class="title">Out of Water</div>
       <div class="big-score" id="finalScore">0.0 mi</div>
       <div class="best" id="bestScore">Best 0.0 mi</div>
+      <div class="best" id="seedsScore" style="font-family:var(--serif);font-size:15px;opacity:.8;color:var(--gold)">🌱 Seeds planted: 0</div>
       <div class="sub" id="overMsg"></div>
       <button id="againBtn">Cross Again</button>
       <div class="linkrow">
@@ -414,6 +534,36 @@
       <div id="reviveHearts" class="big-score">❤ x0</div>
       <button id="reviveBtn">Use ❤ to Revive</button>
       <button id="endRunBtn" class="textbtn">Keep ❤ &amp; End Run</button>
+    </div>
+  </div>
+
+  <!-- THE LAST SEED — oasis planting animation -->
+  <div id="oasisScreen" class="hidden">
+    <div id="oasisGround"></div>
+    <div id="oasisStage">
+      <img id="plantPalm" src="assets/palm.png" alt="" onerror="this.outerHTML='<div id=&quot;plantPalm&quot; style=&quot;font-size:120px;line-height:1;bottom:0;transform:translateX(-50%) scale(.14)&quot;>🌴</div>'">
+      <img id="plantSprout" src="assets/sprout.png" alt="" onerror="this.outerHTML='<div id=&quot;plantSprout&quot; style=&quot;font-size:48px;line-height:1;bottom:0;transform:translateX(-50%) scale(0)&quot;>🌱</div>'">
+      <div id="plantSeed"></div>
+      <img id="plantRemi" src="assets/remi_plant.png" alt="" onerror="this.style.display='none'">
+    </div>
+    <div id="oasisText">
+      <div id="oasisTitle">Oasis revived</div>
+      <div id="oasisSub">🌱 Seeds planted: 0</div>
+    </div>
+    <div id="oasisHint">tap to continue</div>
+  </div>
+
+  <!-- YOUR GROVE — lifetime stats -->
+  <div class="overlay hidden" id="groveScreen">
+    <div class="panel">
+      <div class="title">Your Grove</div>
+      <div class="tagline">Every seed Remi has planted.</div>
+      <div class="grove-rows">
+        <div class="grove-row"><span class="gl">🌴 Oases revived</span><span class="gv" id="groveTrees">0</span></div>
+        <div class="grove-row"><span class="gl">🥾 Best distance</span><span class="gv" id="groveBest">0.0 mi</span></div>
+        <div class="grove-row"><span class="gl">🧭 Total distance</span><span class="gv" id="groveTotal">0.0 mi</span></div>
+      </div>
+      <button id="groveCloseBtn">Close</button>
     </div>
   </div>
 
@@ -640,6 +790,13 @@
 
   let best = +(localStorage.getItem('ionrush_best') || 0);
   let bestMiles = +(localStorage.getItem('ionrush_best_miles') || 0);
+
+  // ---- THE LAST SEED — oasis / seed planting ----
+  let seedsThisRun = 0;          // seeds planted this run (shown in recap)
+  let lifetimeTrees = parseInt(localStorage.getItem('ionrush_trees'), 10) || 0;
+  let lifetimeMiles = +(localStorage.getItem('ionrush_total_miles') || 0);
+  let oasisAnimating = false;    // when true, gameplay (update) is frozen
+  let oasisLeg = 0;              // highest 10-mile boundary already celebrated (no double-fire)
 
   // ---- milestone / record tracking ----
   const TIER_MILES = [
@@ -961,6 +1118,8 @@
     heartSpawnTimer = 35 + Math.random() * 20;
     // milestone / record flags
     tierMileHit = {}; roundMileHit = 0; recordBroken = false;
+    // the last seed / oasis
+    seedsThisRun = 0; oasisLeg = 0; oasisAnimating = false;
     // journey / zone state — start at MIDDAY (T1)
     player.w = BASE_W;
     recentKeys = []; zoneCount = 1; oasisCadence = 4;
@@ -1144,6 +1303,15 @@
     pace *= (1 + Math.min(0.4, (combo - 1) * 0.06)); // combo tailwind
     miles += dt * pace;
     checkMilestones();
+
+    // ---- THE LAST SEED: reach an oasis every 10 miles ----
+    // Fire exactly once per 10-mile boundary (oasisLeg guards against double-trigger).
+    const leg = Math.floor(miles / 10);
+    if (leg > oasisLeg) {
+      oasisLeg = leg;
+      triggerOasis();
+      return; // bail out of the rest of this update; gameplay is now frozen
+    }
 
     // power-up timer
     if (forceTimer > 0) { forceTimer = Math.max(0, forceTimer - dt); }
@@ -1473,8 +1641,12 @@
     if (score > best) { best = score; localStorage.setItem('ionrush_best', best); }
     const isBest = miles > bestMiles;
     if (isBest) { bestMiles = miles; localStorage.setItem('ionrush_best_miles', bestMiles); }
+    // accumulate lifetime miles
+    lifetimeMiles += miles;
+    try { localStorage.setItem('ionrush_total_miles', String(lifetimeMiles)); } catch (e) {}
     document.getElementById('finalScore').textContent = miles.toFixed(1) + ' mi';
     document.getElementById('bestScore').textContent = 'Best ' + bestMiles.toFixed(1) + ' mi';
+    document.getElementById('seedsScore').textContent = '🌱 Seeds planted: ' + seedsThisRun;
     const msgs = [
       'The Dry takes everyone eventually.',
       'Remi made it further this time.',
@@ -1504,6 +1676,117 @@
     }
     overScreen.classList.remove('hidden');
   }
+
+  // ============================================================
+  //  THE LAST SEED — oasis arrival + full-screen planting animation
+  // ============================================================
+  const oasisScreen = document.getElementById('oasisScreen');
+  const oEls = {
+    remi:   document.getElementById('plantRemi'),
+    seed:   document.getElementById('plantSeed'),
+    sprout: document.getElementById('plantSprout'),
+    palm:   document.getElementById('plantPalm'),
+    text:   document.getElementById('oasisText'),
+    title:  document.getElementById('oasisTitle'),
+    sub:    document.getElementById('oasisSub'),
+    hint:   document.getElementById('oasisHint'),
+  };
+  let oasisTimers = [];      // pending stage timeouts (cleared on skip)
+  let oasisDone = false;     // grants applied / safe to resume
+
+  function oTimer(fn, ms) { oasisTimers.push(setTimeout(fn, ms)); }
+  function clearOasisTimers() { oasisTimers.forEach(clearTimeout); oasisTimers = []; }
+
+  function triggerOasis() {
+    if (oasisAnimating) return;
+    oasisAnimating = true;     // freeze gameplay (loop skips update while true)
+    oasisDone = false;
+    haptic('success');
+
+    // re-query in case emoji-fallback replaced an <img> with a <div>
+    oEls.palm = document.getElementById('plantPalm');
+    oEls.sprout = document.getElementById('plantSprout');
+    // reset all plant stages to their initial (hidden/small) state
+    oEls.remi.className = ''; oEls.seed.className = ''; oEls.sprout.className = '';
+    oEls.palm.className = ''; oEls.text.className = ''; oEls.hint.className = '';
+    oasisScreen.classList.remove('hidden');
+
+    // (a) Remi kneels & the seed pulses as he presses it in
+    oTimer(() => { oEls.remi.classList.add('in'); }, 60);
+    oTimer(() => { oEls.seed.classList.add('in'); }, 500);
+    // (b) sprout pops from the soil with a gentle bounce; Remi & seed recede
+    oTimer(() => {
+      oEls.seed.classList.add('out');
+      oEls.remi.classList.add('out');
+      oEls.sprout.classList.add('pop');
+      try { SFX.shimmer(); } catch (e) {}
+    }, 1400);
+    // (c) sprout grows into a palm — crossfade sprout->palm, palm eases upward
+    oTimer(() => {
+      oEls.sprout.classList.add('fade');
+      oEls.palm.classList.add('grow');
+    }, 2200);
+    // (d) sparkle burst + bright pleasant arpeggio when the palm "lands"
+    oTimer(() => {
+      try { (SFX.fanfare || SFX.golden)(); } catch (e) {}
+      oasisSparkle();
+    }, 3000);
+    // (e) elegant serif text + (f) tap-to-continue hint
+    oTimer(() => {
+      oEls.sub.textContent = '🌱 Seeds planted: ' + (seedsThisRun + 1);
+      oEls.text.classList.add('show');
+    }, 3200);
+    oTimer(() => { oEls.hint.classList.add('show'); }, 3700);
+    // auto-continue ~3s after the palm finishes growing
+    oTimer(() => { finishOasis(); }, 6200);
+  }
+
+  // soft CSS sparkle/leaf particles over the palm crown
+  function oasisSparkle() {
+    const stage = oEls.palm.parentElement || oasisScreen;
+    for (let i = 0; i < 18; i++) {
+      const s = document.createElement('div');
+      const leaf = Math.random() < 0.4;
+      s.textContent = leaf ? '🍃' : '✨';
+      s.style.cssText =
+        'position:absolute;left:50%;bottom:46%;font-size:' + (12 + Math.random()*10) +
+        'px;pointer-events:none;z-index:4;opacity:1;will-change:transform,opacity;';
+      oasisScreen.appendChild(s);
+      const ang = Math.random() * Math.PI - Math.PI; // upward arc
+      const dist = 60 + Math.random() * 120;
+      const dx = Math.cos(ang) * dist;
+      const dy = -Math.abs(Math.sin(ang) * dist) - 20;
+      s.animate([
+        { transform: 'translate(-50%,0) scale(.5)', opacity: 1 },
+        { transform: 'translate(calc(-50% + ' + dx + 'px),' + dy + 'px) scale(1.1) rotate(' + (Math.random()*240-120) + 'deg)', opacity: 0 }
+      ], { duration: 900 + Math.random()*600, easing: 'cubic-bezier(.2,.7,.3,1)' });
+      setTimeout(() => s.remove(), 1600);
+    }
+  }
+
+  function finishOasis() {
+    if (oasisDone) return;     // grants applied exactly once per oasis
+    oasisDone = true;
+    clearOasisTimers();
+
+    // grant the bonus
+    seedsThisRun++;
+    lifetimeTrees++;
+    try { localStorage.setItem('ionrush_trees', String(lifetimeTrees)); } catch (e) {}
+    hydration = Math.min(1, hydration + 0.25);
+    player.w = BASE_W;             // reset the cup to full width
+    miles += 0.3;                  // small distance bump
+    score += 25;                   // small score bump
+    haptic('success');
+
+    oasisScreen.classList.add('hidden');
+    oasisAnimating = false;
+    last = 0;                      // avoid a dt jump on resume
+    syncHUD();
+  }
+
+  // tap anywhere on the oasis screen to skip straight to continue
+  oasisScreen.addEventListener('click', () => { if (oasisAnimating) finishOasis(); });
 
   // ---- Render ----
   function drawBottle(x, y, tilt) {
@@ -1930,11 +2213,11 @@
     let dt = last ? now - last : 0;
     last = now;
     dt = Math.min(dt, 0.05);
-    if (state === State.PLAY) {
+    if (state === State.PLAY && !oasisAnimating) {
       let scaled = dt * speed;
       const steps = Math.max(1, Math.ceil(scaled / 0.02));
       const sdt = scaled / steps;
-      for (let s = 0; s < steps && state === State.PLAY; s++) update(sdt);
+      for (let s = 0; s < steps && state === State.PLAY && !oasisAnimating; s++) update(sdt);
       syncHUD();
     }
     render();
@@ -2002,6 +2285,9 @@
     onboard.classList.add('hidden');
     startScreen.classList.add('hidden');
     overScreen.classList.add('hidden');
+    groveScreen.classList.add('hidden');
+    clearOasisTimers();
+    oasisScreen.classList.add('hidden');
     document.getElementById('reviveScreen').classList.add('hidden');
     document.getElementById('bestBanner').classList.remove('show');
     dragging = false; last = 0;
@@ -2022,6 +2308,17 @@
     document.getElementById('reviveScreen').classList.add('hidden');
     finalGameOver();
   });
+
+  // ---- Your Grove (lifetime stats) ----
+  const groveScreen = document.getElementById('groveScreen');
+  function showGrove() {
+    document.getElementById('groveTrees').textContent = String(lifetimeTrees);
+    document.getElementById('groveBest').textContent = bestMiles.toFixed(1) + ' mi';
+    document.getElementById('groveTotal').textContent = lifetimeMiles.toFixed(1) + ' mi';
+    groveScreen.classList.remove('hidden');
+  }
+  document.getElementById('groveStartBtn').addEventListener('click', () => { initAudio(); SFX.click(); showGrove(); });
+  document.getElementById('groveCloseBtn').addEventListener('click', () => { SFX.click(); groveScreen.classList.add('hidden'); });
 
   // Leaderboard buttons (Game Center; no-op on web)
   document.getElementById('lbStartBtn').addEventListener('click', () => { initAudio(); SFX.click(); gc('show'); });
