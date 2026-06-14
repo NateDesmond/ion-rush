@@ -467,6 +467,12 @@
     // soft chime when a zone changes
     zone: () => [523.25, 783.99, 1046.5].forEach((f, i) =>
       voice(f, { type: 'sine', dur: 0.6, vol: 0.1, a: 0.008, wet: 0.6, delay: i * 0.09 })),
+    // short "tok" blip when a drop bounces off the cup wall (distinct from catch)
+    tink: () => {
+      const f = 1500 + Math.random() * 500;
+      voice(f, { type: 'triangle', dur: 0.07, vol: 0.11, a: 0.002, slideTo: f * 0.7, wet: 0.15 });
+      noise(0.04, { type: 'highpass', freq: 3200, vol: 0.05, wet: 0.1 });
+    },
   };
 
   let score = 0, hydration = 0, combo = 1, comboTimer = 0, spawnTimer = 0, spawnGap = 0.85, elapsed = 0, shakeT = 0;
@@ -879,12 +885,47 @@
       else key = 'coffee';
     }
     const t = TYPES[key];
-    const x = 30 + Math.random() * (W - 60);
+    let x = 30 + Math.random() * (W - 60);
+    // ---- never let an opposite-category (good vs bad) drop fully overlap ----
+    // Enforce a minimum horizontal gap vs opposite-type drops arriving around
+    // the same time, so a quick player can always thread between them.
+    const MIN_OPP_GAP = player.w * 0.42 + 18 + 20; // mouth-half + bad radius + margin
+    const rimYnow = player.y - player.h / 2;
+    for (let pass = 0; pass < 3; pass++) {
+      let conflict = null, worstDx = Infinity;
+      for (const o of drops) {
+        if (o.t.good === t.good) continue;          // same category — ignore
+        if (o.y > rimYnow + CATCH_BAND) continue;    // already past the cup — ignore
+        if (Math.abs(o.y - (-30)) >= 160) continue;  // not arriving around same time
+        const dx = Math.abs(o.x - x);
+        if (dx < MIN_OPP_GAP && dx < worstDx) { conflict = o; worstDx = dx; }
+      }
+      if (!conflict) break;
+      const roomRight = (W - 30) - conflict.x;       // space to push x to the right of conflict
+      const roomLeft = conflict.x - 30;              // space to the left
+      // try shifting toward whichever side has more room
+      let nx;
+      if (roomRight >= roomLeft) {
+        nx = Math.min(W - 30, conflict.x + MIN_OPP_GAP);
+        if (nx - conflict.x < MIN_OPP_GAP) {         // right side too tight
+          const altL = Math.max(30, conflict.x - MIN_OPP_GAP);
+          if (conflict.x - altL >= nx - conflict.x) nx = altL; // left reaches farther
+        }
+      } else {
+        nx = Math.max(30, conflict.x - MIN_OPP_GAP);
+        if (conflict.x - nx < MIN_OPP_GAP) {
+          const altR = Math.min(W - 30, conflict.x + MIN_OPP_GAP);
+          if (altR - conflict.x >= conflict.x - nx) nx = altR;
+        }
+      }
+      x = nx + (Math.random() - 0.5) * 6;            // tiny jitter so it isn't robotic
+      x = Math.max(30, Math.min(W - 30, x));
+    }
     let vy = 120 + elapsed * 4 + Math.random() * 70;
     const d = {
       key, t, x,
       y: -30,
-      vy: vy,
+      vy: vy, vx: 0, bounced: false,
       rot: Math.random() * 6, vr: (Math.random() - .5) * 3, wob: Math.random() * 6
     };
     // Sandstorm wind: give the drop a steady ±~40px/s horizontal drift
@@ -972,6 +1013,7 @@
     for (let i = drops.length - 1; i >= 0; i--) {
       const d = drops[i];
       d.y += d.vy * dt;
+      if (d.vx) { d.x += d.vx * dt; d.vx *= 0.92; if (Math.abs(d.vx) < 2) d.vx = 0; } // bounce/push velocity, decays
       if (d.wind) d.x += d.wind * dt;            // per-drop horizontal wind drift
       else if (windDrift) d.x += windDrift * dt; // ambient zone wind
       d.rot += d.vr * dt;
@@ -1002,13 +1044,61 @@
       }
 
       // catch test: only when the drop crosses the cup's TOP RIM band and is
-      // within the mouth opening horizontally (sides don't catch).
-      if (d.y >= rimY && d.y <= rimY + CATCH_BAND && Math.abs(d.x - px) <= mouthHalf) {
+      // within the mouth opening horizontally (sides don't catch). A bounced
+      // drop has been deflected away and can no longer be caught.
+      if (!d.bounced && d.y >= rimY && d.y <= rimY + CATCH_BAND && Math.abs(d.x - px) <= mouthHalf) {
         catchDrop(d);
         drops.splice(i, 1);
         continue;
       }
+      // side-wall bounce: drop hits the cup body (outside the mouth, within the
+      // cup walls + its radius) — deflect it satisfyingly, no catch/score.
+      if (!d.bounced) {
+        const offset = Math.abs(d.x - px);
+        if (d.y >= rimY && d.y <= py + player.h / 2 &&
+            offset > mouthHalf && offset <= pw / 2 + d.t.r) {
+          const dir = d.x >= px ? 1 : -1;
+          d.vx = dir * (200 + Math.random() * 60);   // kick outward
+          d.vy = -110;                                // small upward pop
+          d.bounced = true;
+          // juice: spark particles + cup wobble + light "tok"
+          for (let s = 0; s < 6; s++) {
+            const a = (-Math.PI / 2) + dir * (0.3 + Math.random() * 0.9), sp = 70 + Math.random() * 130;
+            particles.push({ x: d.x, y: d.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30,
+              life: 0.4 + Math.random() * 0.3, age: 0, r: 1.5 + Math.random() * 2.5,
+              color: d.t.color[Math.random() < .5 ? 0 : 1] });
+          }
+          player.pop = Math.max(player.pop, 0.45);
+          player.tilt += dir * 0.12;
+          SFX.tink();
+          haptic('light');
+        }
+      }
       if (d.y > H + 50 || d.y < -70) drops.splice(i, 1);
+    }
+
+    // ---- light in-flight safeguard: keep opposite-type pairs from stacking ----
+    // If drift would push a good+bad pair within ~MIN_OPP_GAP*0.6 while both are
+    // still above the rim, gently nudge them apart (subtle, never snappy).
+    {
+      const NUDGE = (player.w * 0.42 + 18 + 20) * 0.6;
+      for (let a = 0; a < drops.length; a++) {
+        const da = drops[a];
+        if (da.bounced || da.y >= rimY) continue;
+        for (let b = a + 1; b < drops.length; b++) {
+          const db = drops[b];
+          if (db.bounced || db.y >= rimY) continue;
+          if (da.t.good === db.t.good) continue;     // only opposite categories
+          if (Math.abs(da.y - db.y) >= 120) continue; // arriving around same time
+          const dx = da.x - db.x, ax = Math.abs(dx);
+          if (ax < NUDGE) {
+            const dir = dx >= 0 ? 1 : -1;
+            const push = (NUDGE - ax) * 0.5 * dt * 6;  // small, frame-scaled
+            da.x = Math.max(30, Math.min(W - 30, da.x + dir * push));
+            db.x = Math.max(30, Math.min(W - 30, db.x - dir * push));
+          }
+        }
+      }
     }
 
     // rain ambience driven by zone (Rain + Thunderstorm)
