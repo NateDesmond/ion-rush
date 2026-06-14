@@ -137,6 +137,25 @@
   #hydroBar.low { animation: hydPulse 1s ease-in-out infinite; }
   @keyframes hydPulse { 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
 
+  /* TOP-CENTER live points readout (the headline score) */
+  #pointsHud {
+    position: absolute; z-index: 4; pointer-events: none;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; line-height: 1;
+    text-align: center;
+  }
+  #pointsHud.hidden { display: none; }
+  #pointsVal {
+    font-family: var(--serif); font-weight: 600; font-size: 34px; color: var(--cream);
+    letter-spacing: .5px; text-shadow: 0 2px 8px rgba(0,0,0,.55);
+  }
+  #pointsHud .lbl {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 600; font-size: 10px; letter-spacing: 2.5px; opacity: .65;
+    color: var(--cream); margin-top: 3px; text-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+
   /* darkening behind HUD on bright zones, keeps text legible */
   #hudShade {
     position: absolute; top: 0; left: 0; right: 0;
@@ -417,7 +436,8 @@
     font-size: 12px; letter-spacing: 1px; color: rgba(6,64,61,.6);
     opacity: 0; transition: opacity .6s ease;
   }
-  #oasisHint.show { opacity: 1; }
+  #oasisHint.show { opacity: 1; animation: oasisHintPulse 1.6s ease-in-out infinite; }
+  @keyframes oasisHintPulse { 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
 
   /* ============================================================
      YOUR GROVE — lifetime stats panel
@@ -438,6 +458,9 @@
   <canvas id="game"></canvas>
 
   <div id="hudShade"></div>
+
+  <!-- TOP-CENTER: live POINTS (the headline score) -->
+  <div id="pointsHud" class="hidden"><span id="pointsVal">0</span><span class="lbl">PTS</span></div>
 
   <!-- BOTTOM: MILES WALKED journey bar with Remi walking along it (full width) -->
   <div id="hud">
@@ -504,9 +527,11 @@
     <div class="panel">
       <div id="bestBanner">New Furthest</div>
       <div class="title">Out of Water</div>
-      <div class="big-score" id="finalScore">0.0 mi</div>
-      <div class="best" id="bestScore">Best 0.0 mi</div>
-      <div class="best" id="seedsScore" style="font-family:var(--serif);font-size:15px;opacity:.8;color:var(--gold)">🌱 Seeds planted: 0</div>
+      <div class="big-score" id="finalScore">0</div>
+      <div class="best" id="pointsLabel" style="font-family:var(--serif);font-size:14px;letter-spacing:2px;opacity:.7">POINTS</div>
+      <div class="best" id="finalMiles" style="font-family:var(--serif);font-size:18px;opacity:.85;margin-top:4px">0.0 mi · 🌱 0 seeds</div>
+      <div class="best" id="pointsBreak" style="font-size:12px;opacity:.6;margin-top:2px">rain 0 · miles 0 · seeds 0</div>
+      <div class="best" id="bestScore">Best 0 pts</div>
       <div class="sub" id="overMsg"></div>
       <button id="againBtn">Cross Again</button>
       <div class="linkrow">
@@ -761,6 +786,11 @@
 
   let score = 0, hydration = 0, combo = 1, comboTimer = 0, spawnTimer = 0, spawnGap = 0.85, elapsed = 0, shakeT = 0;
   let miles = 0;                 // primary metric: distance across the Dry
+  // ---- POINTS — the headline score (rain + miles + seeds) ----
+  let ptsRain = 0;               // +5 per good drop caught
+  let ptsMiles = 0;              // miles*20 (continuous)
+  let ptsSeeds = 0;              // seedsThisRun*250
+  let points = 0;                // Math.round(ptsRain + ptsMiles + ptsSeeds)
   let drops = [], particles = [];
   const BASE_W = 78;             // un-narrowed cup width (stored once)
   const player = { x: 0, w: BASE_W, h: 58, y: 0, vx: 0, tilt: 0, pop: 0 };
@@ -774,6 +804,8 @@
     walker:       document.getElementById('walker'),
     hydroFill:    document.getElementById('hydroFill'),
     hydroBar:     document.getElementById('hydroBar'),
+    pointsHud:    document.getElementById('pointsHud'),
+    pointsVal:    document.getElementById('pointsVal'),
   };
   let lastWholeMile = 0; // last leg's start (lastOasisMiles) — drives the step accent + walker reset
   const startScreen = document.getElementById('startScreen');
@@ -781,6 +813,7 @@
 
   let best = +(localStorage.getItem('ionrush_best') || 0);
   let bestMiles = +(localStorage.getItem('ionrush_best_miles') || 0);
+  let bestPoints = +(localStorage.getItem('ionrush_best_points') || 0);
 
   // ---- THE LAST SEED — oasis / seed planting ----
   let seedsThisRun = 0;          // seeds planted this run (shown in recap)
@@ -835,6 +868,14 @@
         life: 0.9 + Math.random()*0.7, age: 0, r: 2 + Math.random()*5,
         color: ['#ffd400','#fff7a8','#16c2b3'][Math.floor(Math.random()*3)] });
     }
+  }
+
+  // recompute the headline points from its three sources
+  function computePoints() {
+    ptsMiles = miles * 20;
+    ptsSeeds = seedsThisRun * 250;
+    points = Math.round(ptsRain + ptsMiles + ptsSeeds);
+    return points;
   }
 
   function checkMilestones() {
@@ -1101,6 +1142,7 @@
 
   function reset() {
     score = 0; miles = 0; hydration = 0.82; combo = 1; comboTimer = 0; lastWholeMile = 0;
+    ptsRain = 0; ptsMiles = 0; ptsSeeds = 0; points = 0;
     spawnTimer = 0; spawnGap = 0.85; elapsed = 0; shakeT = 0;
     drops = []; particles = []; floaters = [];
     cleanStreak = 0; lastComboTitle = 0; thunderTimer = 0;
@@ -1499,6 +1541,7 @@
     const t = d.t;
     if (t.good) {
       player.pop = 1; // cup pop on catch
+      ptsRain += 5;   // POINTS: every good drop caught is worth +5
 
       if (t.heart) {
         player.pop = 1;
@@ -1588,6 +1631,7 @@
   function showRevivePrompt() {
     state = State.OVER;
     shakeT = 0; // calm the background behind the prompt
+    HUD.pointsHud.classList.add('hidden');
     SFX.over();
     haptic('warning');
     document.getElementById('reviveHearts').textContent = '❤ x' + hearts;
@@ -1619,19 +1663,27 @@
   function finalGameOver() {
     state = State.OVER;
     shakeT = 0; // calm the background behind the game-over panel
+    HUD.pointsHud.classList.add('hidden');
     SFX.over();
-    // Game Center: submit centi-miles
-    gc('submit', { score: Math.round(miles * 100) });
+    // finalize the headline points
+    computePoints();
+    // Game Center: submit POINTS (the integer high score)
+    gc('submit', { score: points });
     // keep an internal points best too (not displayed)
     if (score > best) { best = score; localStorage.setItem('ionrush_best', best); }
-    const isBest = miles > bestMiles;
-    if (isBest) { bestMiles = miles; localStorage.setItem('ionrush_best_miles', bestMiles); }
+    if (miles > bestMiles) { bestMiles = miles; localStorage.setItem('ionrush_best_miles', bestMiles); }
+    // NEW BEST is now keyed on POINTS
+    const isBest = points > bestPoints;
+    if (isBest) { bestPoints = points; try { localStorage.setItem('ionrush_best_points', String(bestPoints)); } catch (e) {} }
     // accumulate lifetime miles
     lifetimeMiles += miles;
     try { localStorage.setItem('ionrush_total_miles', String(lifetimeMiles)); } catch (e) {}
-    document.getElementById('finalScore').textContent = miles.toFixed(1) + ' mi';
-    document.getElementById('bestScore').textContent = 'Best ' + bestMiles.toFixed(1) + ' mi';
-    document.getElementById('seedsScore').textContent = '🌱 Seeds planted: ' + seedsThisRun;
+    document.getElementById('finalScore').textContent = points.toLocaleString();
+    document.getElementById('finalMiles').textContent =
+      miles.toFixed(1) + ' mi · 🌱 ' + seedsThisRun + ' seed' + (seedsThisRun === 1 ? '' : 's');
+    document.getElementById('pointsBreak').textContent =
+      'rain ' + Math.round(ptsRain) + ' · miles ' + Math.round(ptsMiles) + ' · seeds ' + Math.round(ptsSeeds);
+    document.getElementById('bestScore').textContent = 'Best ' + bestPoints.toLocaleString() + ' pts';
     const msgs = [
       'The Dry takes everyone eventually.',
       'Remi made it further this time.',
@@ -1641,8 +1693,8 @@
     document.getElementById('overMsg').textContent = msgs[Math.floor(elapsed) % msgs.length];
 
     const banner = document.getElementById('bestBanner');
-    if (isBest && miles > 0) {
-      banner.textContent = 'New Furthest';
+    if (isBest && points > 0) {
+      banner.textContent = 'NEW BEST!';
       banner.classList.add('show');
       // celebration burst + triumphant sound
       for (let k = 0; k < 60; k++) {
@@ -1724,8 +1776,7 @@
       oEls.text.classList.add('show');
     }, 3200);
     oTimer(() => { oEls.hint.classList.add('show'); }, 3700);
-    // auto-continue ~3s after the palm finishes growing
-    oTimer(() => { finishOasis(); }, 6200);
+    // NO auto-continue: the oasis stays frozen until the player taps anywhere.
   }
 
   // soft CSS sparkle/leaf particles over the palm crown
@@ -1823,13 +1874,52 @@
     c.closePath();
   }
 
+  // ---- zone-themed snowflake (Frostpass good-drop skin) ----
+  function drawSnowflake(r) {
+    // soft icy glow + 6-spoke crystal with little branches
+    ctx.save();
+    ctx.shadowColor = 'rgba(180,230,255,.9)'; ctx.shadowBlur = 10;
+    ctx.strokeStyle = '#eaf7ff'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(2, r * 0.16);
+    const arm = r * 1.15;
+    for (let i = 0; i < 6; i++) {
+      ctx.rotate(Math.PI / 3);
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(0, -arm);
+      // two little branch pairs
+      ctx.moveTo(0, -arm * 0.55); ctx.lineTo(arm * 0.30, -arm * 0.78);
+      ctx.moveTo(0, -arm * 0.55); ctx.lineTo(-arm * 0.30, -arm * 0.78);
+      ctx.moveTo(0, -arm * 0.85); ctx.lineTo(arm * 0.22, -arm * 1.02);
+      ctx.moveTo(0, -arm * 0.85); ctx.lineTo(-arm * 0.22, -arm * 1.02);
+      ctx.stroke();
+    }
+    // bright icy-blue core
+    const cg = ctx.createRadialGradient(0, 0, 1, 0, 0, r * 0.7);
+    cg.addColorStop(0, '#ffffff'); cg.addColorStop(1, '#bfe6ff');
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.34, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // soft sparkle
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.arc(-r * 0.18, -r * 0.2, r * 0.10, 0, Math.PI * 2); ctx.fill();
+  }
+
   function drawDrop(d) {
     const t = d.t, r = t.r;
+    const zkey = curZoneObj ? curZoneObj.key : '';
     const wob = Math.sin(d.wob) * 1.5;
     ctx.save();
     ctx.translate(d.x, d.y);
     ctx.rotate(Math.sin(d.rot) * 0.2);
     if (d.decoy) ctx.globalAlpha = 0.4 + 0.25 * Math.sin(elapsed * 12 + d.wob); // shimmering mirage
+
+    // FROSTPASS: plain good drops (not special power-ups) render as snowflakes
+    if (zkey === 'frost' && t.good && !t.heart && !t.shield && !t.golden && !t.ion) {
+      drawSnowflake(r);
+      ctx.restore();
+      return;
+    }
 
     if (t.heart) {
       const pulse = 1 + Math.sin(d.wob) * 0.05;
@@ -1851,6 +1941,16 @@
       ctx.restore();
       return;
     }
+    // EMBER BADLANDS: good drops glow warmer/embery; NIGHT & AURORA: faint shimmer
+    const emberGood = (zkey === 'ember') && t.good && !t.heart && !t.shield;
+    const nightShimmer = (zkey === 'night' || zkey === 'aurora') && t.good && !t.heart && !t.shield && !t.golden;
+    ctx.save();
+    if (emberGood) { ctx.shadowColor = 'rgba(255,140,40,.85)'; ctx.shadowBlur = 14; }
+    else if (nightShimmer) {
+      const s = 0.5 + 0.5 * Math.sin(elapsed * 4 + d.wob);
+      ctx.shadowColor = 'rgba(170,230,255,' + (0.45 + 0.4 * s).toFixed(3) + ')';
+      ctx.shadowBlur = 8 + 8 * s;
+    }
     const g = ctx.createRadialGradient(-r*0.3, -r*0.4, 1, 0, 0, r*1.4);
     g.addColorStop(0, t.color[0]);
     g.addColorStop(1, t.color[1]);
@@ -1861,6 +1961,20 @@
     ctx.bezierCurveTo(-r*0.9, r*1.1, -r*1.2, -r*0.2, 0, -r*1.5 + wob);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
+    // FROSTPASS: bad drops keep a clearly-bad dark tone but pick up a frosty rim
+    if (zkey === 'frost' && !t.good) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(220,240,255,.85)'; ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(190,225,255,.7)'; ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.moveTo(0, -r*1.5 + wob);
+      ctx.bezierCurveTo(r*1.2, -r*0.2, r*0.9, r*1.1, 0, r*1.1);
+      ctx.bezierCurveTo(-r*0.9, r*1.1, -r*1.2, -r*0.2, 0, -r*1.5 + wob);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.fillStyle = 'rgba(255,255,255,.6)';
     ctx.beginPath();
     ctx.ellipse(-r*0.3, -r*0.3, r*0.22, r*0.4, -0.5, 0, Math.PI*2);
@@ -2150,6 +2264,11 @@
   }
 
   function syncHUD() {
+    // --- POINTS (top-center headline) ---
+    computePoints();
+    HUD.pointsVal.textContent = points.toLocaleString();
+    HUD.pointsHud.classList.toggle('hidden', state !== State.PLAY);
+
     // --- miles serif readout ---
     HUD.milesReadout.innerHTML = miles.toFixed(1) + ' <span>mi' + (combo>1?' ×'+combo:'') + '</span>';
 
