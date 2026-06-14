@@ -10,6 +10,13 @@
     --ion-deep: #0a8f86;
     --ion-pale: #d6fbf4;
     --ink: #06403d;
+    /* premium onboarding aesthetic tokens */
+    --cream: #F6F2E7;
+    --serif: ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --gold: #e7c46a;
+    --panel-bg: rgba(18,22,38,0.55);
+    --pill-bg: rgba(255,255,255,0.10);
+    --pill-bord: rgba(246,242,231,0.45);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -36,18 +43,25 @@
     padding: 14px 18px; pointer-events: none;
   }
   .logo {
-    font-weight: 800; font-style: italic; letter-spacing: -.5px;
-    font-size: 20px; color: var(--ion-deep);
-    text-shadow: 0 1px 0 #fff;
+    font-family: var(--serif); font-weight: 600; letter-spacing: .5px;
+    font-size: 19px; color: var(--cream);
+    text-shadow: 0 1px 6px rgba(0,0,0,.55);
   }
-  .logo span { color: var(--ion-blue); }
+  .logo span { color: var(--cream); opacity: .85; }
   #hearts {
-    margin-left: auto; font-weight: 800; font-size: 15px; color: var(--ion-deep);
-    text-shadow: 0 1px 0 #fff; letter-spacing: .5px; white-space: nowrap;
+    margin-left: auto; font-weight: 600; font-size: 14px; color: var(--cream);
+    text-shadow: 0 1px 5px rgba(0,0,0,.55); letter-spacing: .5px; white-space: nowrap; opacity: .9;
   }
   #hearts.hidden { display: none; }
-  #score { font-weight: 800; font-size: 22px; color: var(--ink); position: relative; z-index: 2; }
-  #score small { font-weight: 600; font-size: 12px; opacity: .6; display:block; text-align:right; }
+  #score {
+    font-family: var(--serif); font-weight: 600; font-size: 23px; color: var(--cream);
+    position: relative; z-index: 2; text-shadow: 0 1px 6px rgba(0,0,0,.55);
+  }
+  #score small {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 600; font-size: 10px; opacity: .65; display:block; text-align:right;
+    letter-spacing: 1.5px;
+  }
   /* darkening behind HUD on bright zones, keeps text legible */
   #hudShade {
     position: absolute; top: 0; left: 0; right: 0;
@@ -57,19 +71,24 @@
   }
   #hudShade.on { opacity: 1; }
 
-  /* Hydration meter */
+  /* Hydration meter — slim elegant bar */
   #meterWrap {
-    position: absolute; top: calc(56px + env(safe-area-inset-top, 0px)); left: 18px; right: 18px;
-    height: 16px; border-radius: 10px; background: rgba(255,255,255,.55);
-    border: 2px solid #fff; overflow: hidden; pointer-events: none;
-    box-shadow: inset 0 1px 3px rgba(6,64,61,.15);
+    position: absolute; top: calc(58px + env(safe-area-inset-top, 0px)); left: 18px; right: 18px;
+    height: 6px; border-radius: 4px; background: rgba(246,242,231,.16);
+    border: none; overflow: hidden; pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,.3);
+  }
+  #meterWrap::after {
+    content: 'HYDRATION'; position: absolute; right: 0; top: 9px;
+    font-size: 8px; letter-spacing: 1.5px; color: var(--cream); opacity: .55;
+    text-shadow: 0 1px 4px rgba(0,0,0,.5);
   }
   #meter {
     height: 100%; width: 70%;
-    background: linear-gradient(90deg, var(--ion-deep), var(--ion-blue));
-    border-radius: 8px; transition: width .12s linear;
+    background: linear-gradient(90deg, rgba(246,242,231,.9), #74e3d6);
+    border-radius: 4px; transition: width .12s linear;
   }
-  #meterWrap.low #meter { background: linear-gradient(90deg,#ff7a59,#ff4d4d); }
+  #meterWrap.low #meter { background: linear-gradient(90deg,#ffb079,#ff6a5e); }
 
   #controls {
     position: absolute; top: calc(78px + env(safe-area-inset-top, 0px)); right: 14px; z-index: 7;
@@ -77,76 +96,110 @@
   }
   #controls button {
     -webkit-appearance: none; appearance: none;
-    font-weight: 900; font-size: 14px; font-style: italic; letter-spacing: .5px;
-    color: var(--ion-deep); background: rgba(255,255,255,.78);
+    font-weight: 600; font-size: 13px; letter-spacing: .5px;
+    color: var(--cream); background: rgba(255,255,255,.10);
     padding: 7px 13px; border-radius: 20px; cursor: pointer;
-    border: 2px solid #fff; box-shadow: 0 2px 8px rgba(10,143,134,.2);
+    border: 1px solid rgba(246,242,231,.30);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
     transition: transform .12s, background .12s, color .12s;
     min-width: 44px; min-height: 36px; /* comfortable touch target */
   }
   #controls button:active { transform: scale(.9); }
   #speedBadge.boost {
-    color: #fff; background: linear-gradient(180deg,#ff9d2e,#ff6a00);
-    box-shadow: 0 3px 12px rgba(255,106,0,.5);
+    color: #06403d; background: rgba(231,196,106,.85);
+    border-color: rgba(246,242,231,.5);
+    box-shadow: 0 3px 12px rgba(231,196,106,.4);
   }
   #muteBtn.muted { opacity: .55; }
 
-  /* Overlays */
+  /* Overlays — frosted premium panels over the live canvas */
   .overlay {
     position: absolute; inset: 0; display: flex; flex-direction: column;
     align-items: center; justify-content: center; text-align: center;
-    background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.92), rgba(214,251,244,.95));
-    backdrop-filter: blur(2px); padding: 30px; gap: 8px; z-index: 10;
+    background: rgba(10,14,26,0.32);
+    padding: 30px; gap: 8px; z-index: 10;
   }
   .overlay.hidden { display: none; }
+  /* the inner frosted panel */
+  .panel {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    gap: 10px; width: 100%; max-width: 360px;
+    padding: 34px 30px 30px;
+    background: var(--panel-bg);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    border: 1px solid rgba(246,242,231,0.16);
+    border-radius: 26px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.40);
+    color: var(--cream);
+  }
   .title {
-    font-size: 40px; font-weight: 900; font-style: italic; letter-spacing: -1px;
-    color: var(--ion-deep); line-height: 1; margin-bottom: 4px;
+    font-family: var(--serif); font-size: 38px; font-weight: 600; letter-spacing: .5px;
+    color: var(--cream); line-height: 1.05; margin-bottom: 2px;
   }
-  .title span { color: var(--ion-blue); }
-  .sub { font-size: 15px; max-width: 320px; line-height: 1.5; opacity: .85; }
-  .bottle-emoji { font-size: 64px; margin-bottom: 6px; filter: drop-shadow(0 6px 10px rgba(10,143,134,.3)); }
+  .title span { color: var(--cream); opacity: .8; }
+  .tagline { font-family: var(--serif); font-size: 16px; opacity: .82; font-style: italic; margin-top: -2px; }
+  .sub { font-size: 14px; max-width: 300px; line-height: 1.55; opacity: .78; }
+  .sub b { color: var(--cream); font-weight: 700; }
+  .sub i { color: var(--gold); font-style: italic; }
+  .bottle-emoji { font-size: 56px; margin-bottom: 2px; filter: drop-shadow(0 6px 12px rgba(0,0,0,.35)); }
+  .remi { width: 110px; height: 110px; object-fit: contain; margin-bottom: 2px;
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,.4)); }
+  /* primary slim translucent capsule */
   button {
-    margin-top: 18px; border: none; cursor: pointer;
-    background: linear-gradient(180deg, var(--ion-blue), var(--ion-deep));
-    color: #fff; font-weight: 800; font-size: 18px; letter-spacing: .5px;
-    padding: 14px 38px; border-radius: 40px;
-    box-shadow: 0 8px 20px rgba(10,143,134,.4), inset 0 1px 0 rgba(255,255,255,.4);
-    transition: transform .08s;
+    margin-top: 16px; cursor: pointer;
+    background: var(--pill-bg);
+    border: 1px solid var(--pill-bord);
+    color: var(--cream); font-weight: 500; font-size: 17px; letter-spacing: .3px;
+    height: 52px; padding: 0 34px; border-radius: 26px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 6px 18px rgba(0,0,0,.22);
+    transition: transform .1s, background .15s;
   }
-  button:active { transform: scale(.95); }
-  .hint { font-size: 13px; opacity: .6; margin-top: 14px; }
-  .big-score { font-size: 30px; font-weight: 900; color: var(--ink); }
-  .best { font-size: 14px; opacity: .7; }
-  .legend { display:flex; gap:18px; margin-top:14px; font-size:13px; flex-wrap:wrap; justify-content:center; }
+  button:active { transform: scale(.96); background: rgba(255,255,255,.18); }
+  .hint { font-size: 11px; opacity: .5; margin-top: 14px; line-height: 1.5; max-width: 300px; }
+  .big-score { font-family: var(--serif); font-size: 46px; font-weight: 600; color: var(--cream); line-height: 1; }
+  .best { font-size: 13px; opacity: .65; letter-spacing: .3px; }
+  .legend { display:flex; gap:16px; margin-top:8px; font-size:11px; flex-wrap:wrap; justify-content:center; opacity:.72; }
   .legend div { display:flex; align-items:center; gap:6px; }
-  .dot { width:18px; height:18px; border-radius:50%; display:inline-block; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
 
-  /* small text buttons (Story replay) */
+  /* understated cream text links (secondary actions) */
   .textbtn {
-    margin-top: 10px; background: none; border: none; box-shadow: none;
-    color: var(--ion-deep); font-weight: 800; font-size: 14px; padding: 6px 10px;
-    border-radius: 16px; opacity: .85;
+    margin-top: 0; background: none; border: none; box-shadow: none;
+    color: var(--cream); font-weight: 500; font-size: 13px; padding: 6px 4px;
+    border-radius: 0; opacity: .7; backdrop-filter: none; height: auto;
+    transition: opacity .15s;
   }
-  .textbtn:active { transform: scale(.94); }
+  .textbtn:active { transform: scale(.96); opacity: 1; }
+
+  /* a row of cream links separated by middots */
+  .linkrow { display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:center; margin-top:8px; }
+  .linkrow .sep { color: var(--cream); opacity: .35; font-size: 12px; }
 
   /* Game-over actions row */
   .actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
-  #shareBtn {
-    margin-top: 18px;
-    background: linear-gradient(180deg,#ffd34d,#ffae00);
-    color: #5a3d00;
-    box-shadow: 0 8px 20px rgba(255,174,0,.4), inset 0 1px 0 rgba(255,255,255,.5);
-  }
+  #shareBtn { /* now a text link, styled via .textbtn */ }
 
-  /* New-best celebration */
+  /* New-best celebration — elegant gold serif */
   #bestBanner {
-    font-size: 26px; font-weight: 900; font-style: italic; letter-spacing: -.5px;
-    color: #ffae00; text-shadow: 0 2px 0 #fff, 0 0 18px rgba(255,174,0,.6);
-    margin-bottom: 2px; opacity: 0; transform: scale(.6); transition: opacity .3s, transform .3s;
+    font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: .5px;
+    color: var(--gold); text-shadow: 0 0 22px rgba(231,196,106,.5);
+    margin-bottom: 2px; opacity: 0; transform: scale(.7); transition: opacity .35s, transform .35s;
   }
-  #bestBanner.show { opacity: 1; transform: scale(1); animation: bestPulse 1.1s ease-in-out infinite; }
-  @keyframes bestPulse { 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.07);} }
+  #bestBanner.show { opacity: 1; transform: scale(1); animation: bestPulse 1.8s ease-in-out infinite; }
+  @keyframes bestPulse { 0%,100%{ opacity:1;} 50%{ opacity:.78;} }
+
+  /* brief "copied!" toast */
+  #toast {
+    position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%) translateY(8px);
+    background: var(--panel-bg); backdrop-filter: blur(10px);
+    border: 1px solid rgba(246,242,231,.2); color: var(--cream);
+    font-size: 13px; padding: 9px 18px; border-radius: 20px; z-index: 30;
+    opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* Combo / streak / zone title flash */
   #eggTitle {
@@ -208,7 +261,7 @@
 
   <div id="hudShade"></div>
   <div id="hud">
-    <div class="logo">ION<span>RUSH</span></div>
+    <div class="logo">Ion<span> Rush</span></div>
     <div id="hearts" class="hidden">❤ x0</div>
     <div id="score">0.0<small>MILES</small></div>
   </div>
@@ -233,48 +286,56 @@
 
   <!-- Start -->
   <div class="overlay" id="startScreen">
-    <div class="bottle-emoji">🥤</div>
-    <div class="title">ION <span>RUSH</span></div>
-    <div class="sub">Remi is lost in <b>the Dry</b>. The sky rains hydration — catch the <b>water</b> and <b>ion drinks</b> to keep going, and dodge the <b>soda &amp; coffee</b> that drain you.</div>
-    <div class="legend">
-      <div><span class="dot" style="background:linear-gradient(180deg,#74e3d6,#16c2b3)"></span>Water +hydration</div>
-      <div><span class="dot" style="background:linear-gradient(180deg,#fff7a8,#ffd400)"></span>Ion ×combo</div>
-      <div><span class="dot" style="background:linear-gradient(180deg,#6b4a35,#3a2418)"></span>Coffee −drain</div>
+    <div class="panel">
+      <img class="remi" src="assets/remi_4.png" alt="" onerror="this.style.display='none'">
+      <div class="title">Ion Rush</div>
+      <div class="tagline">Cross the Dry. Go the distance.</div>
+      <div class="legend">
+        <div><span class="dot" style="background:linear-gradient(180deg,#74e3d6,#16c2b3)"></span>Water</div>
+        <div><span class="dot" style="background:linear-gradient(180deg,#fff7a8,#ffd400)"></span>Ion</div>
+        <div><span class="dot" style="background:linear-gradient(180deg,#6b4a35,#3a2418)"></span>Avoid coffee</div>
+      </div>
+      <button id="startBtn">Begin the Crossing</button>
+      <div class="linkrow">
+        <button id="replayIntroBtn" class="textbtn">Replay intro</button>
+        <span class="sep">·</span>
+        <button id="lbStartBtn" class="textbtn">🏆 Leaderboard</button>
+      </div>
+      <div class="hint">Drag to move · tap the badge for speed · keys ← → F 1–4 M</div>
     </div>
-    <button id="startBtn">START</button>
-    <div class="actions">
-      <button id="storyBtn" class="textbtn">▶ Story</button>
-      <button id="lbStartBtn" class="textbtn">🏆 Leaderboard</button>
-    </div>
-    <div class="hint">Drag to move&nbsp;&nbsp;·&nbsp;&nbsp;Tap <b>1×</b> badge for speed&nbsp;&nbsp;·&nbsp;&nbsp;Keys: <b>← →</b>, <b>F</b>/<b>1–4</b>, <b>M</b></div>
   </div>
 
   <!-- Game over -->
   <div class="overlay hidden" id="overScreen">
-    <div id="bestBanner">★ NEW BEST! ★</div>
-    <div class="bottle-emoji">💧</div>
-    <div class="title">OUT OF WATER</div>
-    <div class="big-score" id="finalScore">0</div>
-    <div class="best" id="bestScore">Best: 0</div>
-    <div class="sub" id="overMsg"></div>
-    <div class="actions">
-      <button id="againBtn">RETRY</button>
-      <button id="shareBtn">Share 📤</button>
+    <div class="panel">
+      <div id="bestBanner">New Furthest</div>
+      <div class="title">Out of Water</div>
+      <div class="big-score" id="finalScore">0.0 mi</div>
+      <div class="best" id="bestScore">Best 0.0 mi</div>
+      <div class="sub" id="overMsg"></div>
+      <button id="againBtn">Cross Again</button>
+      <div class="linkrow">
+        <button id="shareBtn" class="textbtn">Share</button>
+        <span class="sep">·</span>
+        <button id="lbOverBtn" class="textbtn">🏆 Leaderboard</button>
+        <span class="sep">·</span>
+        <button id="debugBtn" class="textbtn">Copy debug log</button>
+      </div>
     </div>
-    <button id="lbOverBtn" class="textbtn">🏆 Leaderboard</button>
   </div>
 
   <!-- Revive prompt -->
   <div class="overlay hidden" id="reviveScreen">
-    <div class="bottle-emoji">💧</div>
-    <div class="title">OUT OF <span>WATER!</span></div>
-    <div class="sub">Spend a heart to revive Remi and keep this run going.</div>
-    <div id="reviveHearts" class="big-score">❤ x0</div>
-    <div class="actions">
-      <button id="reviveBtn">Use ❤ — Revive</button>
-      <button id="endRunBtn" class="textbtn">Keep ❤ — End run</button>
+    <div class="panel">
+      <div class="title">Out of Water</div>
+      <div class="sub">Spend a heart to revive Remi and keep this run going.</div>
+      <div id="reviveHearts" class="big-score">❤ x0</div>
+      <button id="reviveBtn">Use ❤ Revive</button>
+      <button id="endRunBtn" class="textbtn">Keep ❤</button>
     </div>
   </div>
+
+  <div id="toast">copied!</div>
 </div>
 
 <script>
@@ -480,6 +541,7 @@
   let drops = [], particles = [];
   const BASE_W = 78;             // un-narrowed cup width (stored once)
   const player = { x: 0, w: BASE_W, h: 58, y: 0, vx: 0, tilt: 0, pop: 0 };
+  let cupVX = 0;                 // smoothed horizontal velocity (drives tilt)
 
   const HUD = {
     score: document.getElementById('score'),
@@ -501,6 +563,34 @@
   let tierMileHit = {};      // {3:true,...} once-per-run tier milestones
   let roundMileHit = 0;      // highest 5-mile round milestone fired
   let recordBroken = false;  // fired the live "NEW FURTHEST" celebration
+
+  // ---- Per-run telemetry (for the "Copy debug log" diagnostic) ----
+  let tele = {};
+  function resetTelemetry() {
+    tele = {
+      caughtGood: { aqua:0, water:0, ion:0, golden:0, heart:0, shield:0 },
+      caughtBad:  { soda:0, coffee:0 },
+      missedGood: 0,
+      decoys: 0,
+      wallBounces: 0,
+      hydMin: 1,
+      hydGained: 0,
+      hydLostPassive: 0,
+      hydLostBad: 0,
+      powerupsUsed: 0,
+      revives: 0,
+      zonesVisited: [],
+      timeline: [],
+      _sampleT: 0,
+    };
+  }
+  function teleSample() {
+    if (tele.timeline.length >= 40) return;
+    tele.timeline.push({
+      t: +elapsed.toFixed(1), miles: +miles.toFixed(2),
+      hyd: +hydration.toFixed(3), zone: curZoneObj.key, cupW: Math.round(player.w)
+    });
+  }
 
   function goldBurst(n, cx, cy) {
     for (let k = 0; k < n; k++) {
@@ -673,8 +763,8 @@
 
     const normal = z.tier >= 1;
     if (normal) {
-      // narrowing cup on each normal zone
-      player.w = Math.max(BASE_W * 0.62, player.w * 0.95);
+      // narrowing cup on each normal zone (eased: gentler step, higher floor)
+      player.w = Math.max(BASE_W * 0.70, player.w * 0.97);
     } else if (z.key === 'oasis') {
       // lush breather: full cup, top-up, chime
       player.w = BASE_W;
@@ -796,6 +886,8 @@
     recentKeys.push(z0.key);
     applyZoneFlags();
     player.x = W / 2; player.y = playerHomeY(); player.vx = 0; player.tilt = 0; player.pop = 0;
+    cupVX = 0;
+    resetTelemetry();
   }
 
   // ---- Input (relative drag, no teleport) ----
@@ -930,9 +1022,11 @@
     };
     // Sandstorm wind: give the drop a steady ±~40px/s horizontal drift
     if (curZoneObj && curZoneObj.twist === 'wind') d.wind = (Math.random() < 0.5 ? -1 : 1) * (28 + Math.random() * 24);
-    // Heat Mirage: ~30% of normal good drops are shimmering decoys that fade away
-    if (curZoneObj && curZoneObj.twist === 'mirage' && !forceKey && t.good && !t.ion && Math.random() < 0.3) {
+    // Heat Mirage ONLY: ≤25% of normal good drops are shimmering decoys that fade away
+    if (curZoneObj && curZoneObj.key === 'mirage' && curZoneObj.twist === 'mirage' &&
+        !forceKey && t.good && !t.ion && Math.random() < 0.25) {
       d.decoy = true; d.decoyT = 0.7 + Math.random() * 0.6;
+      tele.decoys++;
     }
     drops.push(d);
   }
@@ -991,11 +1085,16 @@
     if (spawnTimer <= 0) { spawnDrop(); spawnTimer = spawnGap; if (Math.random() < 0.15 + elapsed*0.004) spawnDrop(); }
 
     // player movement (keyboard; drag updates player.x directly via events)
+    const prevX = player.x;
     let kv = 0;
     if (keyLeft) kv -= 1; if (keyRight) kv += 1;
     if (kv) { player.x += kv * 520 * dt; dragging = false; }
     player.x = Math.max(player.w/2, Math.min(W - player.w/2, player.x));
-    player.tilt += (kv * 0.25 - player.tilt) * Math.min(1, dt*8);
+    // ---- cup leans into its direction of travel (velocity-driven tilt) ----
+    const instVX = dt > 0 ? (player.x - prevX) / dt : 0;
+    cupVX += (instVX - cupVX) * Math.min(1, dt * 14);        // smooth the velocity
+    const targetTilt = Math.max(-0.32, Math.min(0.32, cupVX * 0.0012));
+    player.tilt += (targetTilt - player.tilt) * Math.min(1, dt * 12);
     if (player.pop > 0) player.pop = Math.max(0, player.pop - dt * 4.5);
 
     // combo decay
@@ -1003,7 +1102,15 @@
 
     // drain over time (harder tuning) — Ember Badlands runs 1.3× hotter
     const drainMul = curZoneObj.twist === 'hotter' ? 1.3 : 1;
-    hydration -= dt * (0.034 + elapsed * 0.0007) * drainMul;
+    const drainAmt = dt * (0.034 + elapsed * 0.0007) * drainMul;
+    hydration -= drainAmt;
+    tele.hydLostPassive += drainAmt;
+
+    // telemetry: zone-visit order + periodic timeline samples + hydration min
+    if (tele.zonesVisited[tele.zonesVisited.length - 1] !== curZoneObj.key) tele.zonesVisited.push(curZoneObj.key);
+    tele._sampleT -= dt;
+    if (tele._sampleT <= 0) { teleSample(); tele._sampleT = 3; }
+    if (hydration < tele.hydMin) tele.hydMin = hydration;
 
     // drops
     const px = player.x, py = player.y, pw = player.w;
@@ -1043,24 +1150,27 @@
         }
       }
 
-      // catch test: only when the drop crosses the cup's TOP RIM band and is
-      // within the mouth opening horizontally (sides don't catch). A bounced
-      // drop has been deflected away and can no longer be caught.
+      // TOP-MOUTH CATCH takes priority: any drop entering the mouth opening
+      // within the rim band is caught reliably, tested BEFORE any bounce logic.
+      // (sides don't catch). A bounced drop has been deflected and can't be caught.
       if (!d.bounced && d.y >= rimY && d.y <= rimY + CATCH_BAND && Math.abs(d.x - px) <= mouthHalf) {
         catchDrop(d);
         drops.splice(i, 1);
         continue;
       }
-      // side-wall bounce: drop hits the cup body (outside the mouth, within the
-      // cup walls + its radius) — deflect it satisfyingly, no catch/score.
+      // side-wall bounce: ONLY on the outer cup walls — strictly outside the
+      // mouth (offset > mouthHalf), within the wall+radius, at the cup-body
+      // vertical level. Never near the mouth/top-center. Horizontal ricochet:
+      // kicked outward and continues falling (no upward pop).
       if (!d.bounced) {
         const offset = Math.abs(d.x - px);
         if (d.y >= rimY && d.y <= py + player.h / 2 &&
             offset > mouthHalf && offset <= pw / 2 + d.t.r) {
-          const dir = d.x >= px ? 1 : -1;
-          d.vx = dir * (200 + Math.random() * 60);   // kick outward
-          d.vy = -110;                                // small upward pop
+          const dir = (d.x - px) >= 0 ? 1 : -1;
+          d.vx = dir * (200 + Math.random() * 60);          // kick outward horizontally
+          d.vy = Math.max(40, d.vy * 0.5);                  // dampen vertical, keep falling
           d.bounced = true;
+          tele.wallBounces++;
           // juice: spark particles + cup wobble + light "tok"
           for (let s = 0; s < 6; s++) {
             const a = (-Math.PI / 2) + dir * (0.3 + Math.random() * 0.9), sp = 70 + Math.random() * 130;
@@ -1074,7 +1184,11 @@
           haptic('light');
         }
       }
-      if (d.y > H + 50 || d.y < -70) drops.splice(i, 1);
+      if (d.y > H + 50 || d.y < -70) {
+        // a good drop that fell off the bottom (not caught, not bounced, not a decoy) is a MISS
+        if (d.y > H + 50 && d.t.good && !d.bounced && !d.decoy && !d.t.heart && !d.t.shield) tele.missedGood++;
+        drops.splice(i, 1);
+      }
     }
 
     // ---- light in-flight safeguard: keep opposite-type pairs from stacking ----
@@ -1143,6 +1257,7 @@
 
       if (t.heart) {
         player.pop = 1;
+        tele.caughtGood.heart++;
         setHearts(hearts + 1);
         (SFX.fanfare || SFX.golden)();
         haptic('success');
@@ -1154,6 +1269,8 @@
       }
 
       if (t.shield) {
+        tele.caughtGood.shield++;
+        tele.powerupsUsed++;
         forceTimer = FORCE_DUR;
         forceField = true;
         SFX.shield();
@@ -1178,8 +1295,9 @@
       let gain = t.pts * combo;
       if (onBeat && !t.golden) { gain += 5; SFX.shimmer(); }
 
-      score += gain;
-      hydration = Math.min(1, hydration + t.hyd);
+      // telemetry: count by type (aqua/water/ion/golden) + actual hydration gained
+      if (tele.caughtGood[d.key] != null) tele.caughtGood[d.key]++;
+      { const before = hydration; hydration = Math.min(1, hydration + t.hyd); tele.hydGained += hydration - before; }
       burst(d.x, d.y, t.color, t.golden ? 26 : (t.ion ? 16 : 12));
       floatText(d.x, d.y - 10, '+' + gain + (onBeat ? ' ✨' : (combo > 1 && t.ion ? ' ×' + combo : '')),
         t.golden ? '#d98700' : (t.ion ? '#e8a400' : '#0a8f86'));
@@ -1199,6 +1317,8 @@
         floatText(d.x, d.y - 10, 'SAFE', '#16c2b3');
         return;
       }
+      if (tele.caughtBad[d.key] != null) tele.caughtBad[d.key]++;
+      tele.hydLostBad += -t.hyd; // t.hyd is negative for bad drops
       hydration += t.hyd; // full penalty always (no low-meter softening)
       combo = 1; comboTimer = 0; cleanStreak = 0; lastComboTitle = 0;
       score = Math.max(0, score - 4);
@@ -1232,6 +1352,7 @@
     if (revivedThisRun || hearts < 1) return;
     setHearts(hearts - 1);
     revivedThisRun = true;
+    tele.revives++;
     SFX.shield();
     haptic('success');
     // clear all currently-falling BAD drops
@@ -1269,7 +1390,7 @@
 
     const banner = document.getElementById('bestBanner');
     if (isBest && miles > 0) {
-      banner.textContent = 'NEW BEST — ' + miles.toFixed(1) + ' mi';
+      banner.textContent = 'New Furthest';
       banner.classList.add('show');
       // celebration burst + triumphant sound
       for (let k = 0; k < 60; k++) {
@@ -1767,7 +1888,6 @@
   }
   document.getElementById('startBtn').addEventListener('click', startGame);
   document.getElementById('againBtn').addEventListener('click', startGame);
-  document.getElementById('storyBtn').addEventListener('click', () => { initAudio(); SFX.click(); showOnboard(); });
   document.getElementById('speedBadge').addEventListener('click', () => { initAudio(); setSpeed(speedIdx + 1); });
   document.getElementById('muteBtn').addEventListener('click', toggleMute);
 
@@ -1884,12 +2004,113 @@
   }
   document.getElementById('shareBtn').addEventListener('click', shareScore);
 
+  // ---- Debug telemetry export ----
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg || 'copied!';
+    t.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.classList.remove('show'), 1400);
+  }
+  function buildDebugReport() {
+    const cg = tele.caughtGood, cb = tele.caughtBad;
+    const totGood = cg.aqua + cg.water + cg.ion + cg.golden + cg.heart + cg.shield;
+    const totBad = cb.soda + cb.coffee;
+    const consts = {
+      drainBase: 0.034, drainRamp: 0.0007, emberMul: 1.3,
+      refillOasis: 0.15, refillTopupCap: 1,
+      narrowStep: 0.97, narrowFloor: 0.70, baseW: BASE_W,
+      mirageDecoyChance: 0.25,
+    };
+    const blob = {
+      duration: +elapsed.toFixed(1), miles: +miles.toFixed(2), best: +bestMiles.toFixed(2),
+      caughtGood: cg, caughtBad: cb, missedGood: tele.missedGood, decoys: tele.decoys,
+      wallBounces: tele.wallBounces,
+      hydMin: +tele.hydMin.toFixed(3),
+      hydGained: +tele.hydGained.toFixed(3),
+      hydLostPassive: +tele.hydLostPassive.toFixed(3),
+      hydLostBad: +tele.hydLostBad.toFixed(3),
+      hydNet: +(tele.hydGained - tele.hydLostPassive - tele.hydLostBad).toFixed(3),
+      powerupsUsed: tele.powerupsUsed, revives: tele.revives,
+      zonesVisited: tele.zonesVisited, timeline: tele.timeline, constants: consts,
+    };
+    const L = [];
+    L.push('=== ION RUSH — RUN DEBUG REPORT ===');
+    L.push('duration: ' + blob.duration + 's   miles: ' + blob.miles + '   best: ' + blob.best);
+    L.push('');
+    L.push('-- CATCHES --');
+    L.push('good caught (' + totGood + '): aqua ' + cg.aqua + ', water ' + cg.water + ', ion ' + cg.ion +
+           ', golden ' + cg.golden + ', heart ' + cg.heart + ', shield ' + cg.shield);
+    L.push('bad caught (' + totBad + '): soda ' + cb.soda + ', coffee ' + cb.coffee);
+    L.push('good MISSED (fell past): ' + tele.missedGood);
+    L.push('mirage decoys encountered: ' + tele.decoys);
+    L.push('wall bounces: ' + tele.wallBounces);
+    L.push('');
+    L.push('-- HYDRATION --');
+    L.push('min: ' + blob.hydMin);
+    L.push('gained: ' + blob.hydGained + '   lost(passive): ' + blob.hydLostPassive +
+           '   lost(bad): ' + blob.hydLostBad);
+    L.push('NET: ' + blob.hydNet);
+    L.push('');
+    L.push('-- RUN --');
+    L.push('powerups used: ' + tele.powerupsUsed + '   revives: ' + tele.revives);
+    L.push('zones (in order): ' + tele.zonesVisited.join(' → '));
+    L.push('');
+    L.push('-- TIMELINE (~3s) --');
+    for (const s of tele.timeline) L.push('  t' + s.t + 's  ' + s.miles + 'mi  hyd ' +
+      s.hyd + '  ' + s.zone + '  cupW ' + s.cupW);
+    L.push('');
+    L.push('-- BALANCE CONSTANTS --');
+    L.push('drain base ' + consts.drainBase + ' +ramp ' + consts.drainRamp + '/s (ember ×' + consts.emberMul + ')');
+    L.push('refills: oasis +' + consts.refillOasis + ' (top-up cap ' + consts.refillTopupCap + ')');
+    L.push('narrowing: step ' + consts.narrowStep + ', floor ' + consts.narrowFloor + ' × baseW(' + consts.baseW + ')');
+    L.push('mirage decoy chance: ' + consts.mirageDecoyChance);
+    L.push('');
+    L.push('JSON: ' + JSON.stringify(blob));
+    return L.join('\n');
+  }
+  function copyDebugLog() {
+    initAudio(); SFX.click();
+    const text = buildDebugReport();
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        document.execCommand('copy'); ta.remove();
+        showToast('copied!');
+      } catch (e) { showToast('copy failed'); }
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => showToast('copied!'), fallback);
+      } else fallback();
+    } catch (e) { fallback(); }
+  }
+  document.getElementById('debugBtn').addEventListener('click', copyDebugLog);
+
+  // ---- Replay intro (native onboarding bridge, with web fallback) ----
+  function replayIntro(){
+    try{
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.replayOnboarding) {
+        window.webkit.messageHandlers.replayOnboarding.postMessage({});
+        return;
+      }
+    }catch(e){}
+    // web fallback: clear the flag and re-show the in-page onboarding if present
+    try { localStorage.removeItem('ionrush_onboarded'); } catch(e){}
+    if (typeof showOnboard === 'function') showOnboard();
+  }
+  document.getElementById('replayIntroBtn').addEventListener('click', () => { initAudio(); SFX.click(); replayIntro(); });
+
   // ---- First-load onboarding ----
   if (!localStorage.getItem('ionrush_onboarded')) {
     showOnboard();
   }
 
   updateSpeedBadge();
+  resetTelemetry();
 
 })();
 </script>
