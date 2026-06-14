@@ -46,8 +46,16 @@
     text-shadow: 0 1px 0 #fff; letter-spacing: .5px; white-space: nowrap;
   }
   #hearts.hidden { display: none; }
-  #score { font-weight: 800; font-size: 22px; color: var(--ink); }
+  #score { font-weight: 800; font-size: 22px; color: var(--ink); position: relative; z-index: 2; }
   #score small { font-weight: 600; font-size: 12px; opacity: .6; display:block; text-align:right; }
+  /* darkening behind HUD on bright zones, keeps text legible */
+  #hudShade {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: calc(54px + env(safe-area-inset-top, 0px));
+    background: linear-gradient(180deg, rgba(0,0,0,.28), rgba(0,0,0,0));
+    opacity: 0; transition: opacity .8s; pointer-events: none; z-index: 1;
+  }
+  #hudShade.on { opacity: 1; }
 
   /* Hydration meter */
   #meterWrap {
@@ -198,10 +206,11 @@
 <div id="wrap">
   <canvas id="game"></canvas>
 
+  <div id="hudShade"></div>
   <div id="hud">
     <div class="logo">ION<span>RUSH</span></div>
     <div id="hearts" class="hidden">❤ x0</div>
-    <div id="score">0<small>SCORE</small></div>
+    <div id="score">0.0<small>MILES</small></div>
   </div>
   <div id="meterWrap"><div id="meter"></div></div>
   <div id="controls">
@@ -461,8 +470,10 @@
   };
 
   let score = 0, hydration = 0, combo = 1, comboTimer = 0, spawnTimer = 0, spawnGap = 0.85, elapsed = 0, shakeT = 0;
+  let miles = 0;                 // primary metric: distance across the Dry
   let drops = [], particles = [];
-  const player = { x: 0, w: 78, h: 58, y: 0, vx: 0, tilt: 0, pop: 0 };
+  const BASE_W = 78;             // un-narrowed cup width (stored once)
+  const player = { x: 0, w: BASE_W, h: 58, y: 0, vx: 0, tilt: 0, pop: 0 };
 
   const HUD = {
     score: document.getElementById('score'),
@@ -473,6 +484,56 @@
   const overScreen = document.getElementById('overScreen');
 
   let best = +(localStorage.getItem('ionrush_best') || 0);
+  let bestMiles = +(localStorage.getItem('ionrush_best_miles') || 0);
+
+  // ---- milestone / record tracking ----
+  const TIER_MILES = [
+    { mi:3,  title:'3 MILES',  sub:'into the canyons' },
+    { mi:8,  title:'8 MILES',  sub:'the Dry deepens' },
+    { mi:15, title:'15 MILES', sub:'the far country' },
+  ];
+  let tierMileHit = {};      // {3:true,...} once-per-run tier milestones
+  let roundMileHit = 0;      // highest 5-mile round milestone fired
+  let recordBroken = false;  // fired the live "NEW FURTHEST" celebration
+
+  function goldBurst(n, cx, cy) {
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, s = 80 + Math.random() * 260;
+      particles.push({ x: cx, y: cy, vx: Math.cos(a)*s, vy: Math.sin(a)*s - 60,
+        life: 0.9 + Math.random()*0.7, age: 0, r: 2 + Math.random()*5,
+        color: ['#ffd400','#fff7a8','#16c2b3'][Math.floor(Math.random()*3)] });
+    }
+  }
+
+  function checkMilestones() {
+    // tier milestones (3 / 8 / 15) — once each per run
+    for (const m of TIER_MILES) {
+      if (miles >= m.mi && !tierMileHit[m.mi]) {
+        tierMileHit[m.mi] = true;
+        flashTitle(m.title, m.sub);
+        goldBurst(46, W/2, H*0.4);
+        SFX.fanfare();
+        haptic('success');
+      }
+    }
+    // round milestones every 5 mi (5,10,20,25...) — skip ones that coincide w/ a tier
+    const round = Math.floor(miles / 5) * 5;
+    if (round >= 5 && round > roundMileHit) {
+      roundMileHit = round;
+      if (!TIER_MILES.some(m => m.mi === round)) {
+        flashTitle(round + ' MILES');
+        SFX.chord();
+      }
+    }
+    // NEW FURTHEST — the moment we pass the stored best mid-run
+    if (!recordBroken && bestMiles > 0 && miles > bestMiles) {
+      recordBroken = true;
+      flashTitle('★ NEW FURTHEST ★');
+      goldBurst(60, W/2, H*0.38);
+      SFX.fanfare();
+      haptic('success');
+    }
+  }
 
   // ---- Scenery / power-up / streak state ----
   let cleanStreak = 0;     // consecutive good catches (breaks on a bad catch)
@@ -488,49 +549,156 @@
   let shieldSpawnTimer = 28 + Math.random() * 12; // first shield window
   let forceField = false; // derived from forceTimer each frame
 
-  // ---- Scenery zone scheduler (Temple Run style) ----
-  const ZONE_DUR = 22;
-  const XFADE = 1.5; // seconds of color cross-fade at transition
+  // ============================================================
+  //  THE CROSSING — procedural scenery zone engine (mile-driven)
+  // ============================================================
+  const XFADE = 1.5; // seconds of sky color cross-fade at transition
+
+  // Each zone: key,name,tier,unlockMile,dur[min,max], sky[top,bottom],
+  //  deco, decoColor, particles, twist, bright
   const ZONES = [
-    { name: 'DAY',    sky: ['#cdfff6', '#79ddd0'], retro: false, rain: false, stars: false },
-    { name: 'SUNSET', sky: ['#ffd49a', '#ff7e8a'], retro: false, rain: false, stars: false },
-    { name: 'NIGHT',  sky: ['#04102a', '#0b2a4a'], retro: false, rain: false, stars: true  },
-    { name: 'RAIN',   sky: ['#5b6b78', '#37505f'], retro: false, rain: true,  stars: false },
-    { name: 'RETRO',  sky: ['#1a0b2e', '#3a0f4a'], retro: true,  rain: false, stars: false },
+    // ---- T1 (unlock 0mi) ----
+    { key:'dawn',     name:'DAWN',        tier:1, unlockMile:0,  dur:[24,30], sky:['#ffd9c2','#ff9eb5'], deco:'dunes', decoColor:'#e89a78', particles:'none',      twist:'none',   bright:false },
+    { key:'midday',   name:'MIDDAY',      tier:1, unlockMile:0,  dur:[24,30], sky:['#cdfff6','#79ddd0'], deco:'dunes', decoColor:'#7ec9bb', particles:'none',      twist:'none',   bright:false },
+    { key:'dunesea',  name:'DUNE SEA',    tier:1, unlockMile:0,  dur:[24,30], sky:['#ffe7a8','#e7b46a'], deco:'dunes', decoColor:'#d49a4e', particles:'dust',      twist:'none',   bright:false },
+    { key:'dustplain',name:'DUST PLAINS', tier:1, unlockMile:0,  dur:[24,30], sky:['#efe1c4','#d8c39a'], deco:'flat', decoColor:'#c9b184', particles:'dust', twist:'none',   bright:false },
+    { key:'scrub',    name:'SCRUBLAND',   tier:1, unlockMile:0,  dur:[24,30], sky:['#dcefca','#aacf94'], deco:'cacti', decoColor:'#4f7a45', particles:'none',      twist:'none',   bright:false },
+    // ---- T2 (unlock 3mi) ----
+    { key:'redmesa',  name:'RED MESA',    tier:2, unlockMile:3,  dur:[20,26], sky:['#ff9a4a','#c43a2a'], deco:'mesa',  decoColor:'#9c3320', particles:'dust',      twist:'none',   bright:false },
+    { key:'saltflat', name:'SALT FLATS',  tier:2, unlockMile:3,  dur:[20,26], sky:['#eaf6ff','#b9d6e6'], deco:'flat',  decoColor:'#cfe2ec', particles:'none',      twist:'glare',  bright:true  },
+    { key:'sunset',   name:'SUNSET',      tier:2, unlockMile:3,  dur:[20,26], sky:['#ffb45a','#7e3b86'], deco:'dunes', decoColor:'#9c5a6a', particles:'none',      twist:'none',   bright:false },
+    { key:'twilight', name:'TWILIGHT',    tier:2, unlockMile:3,  dur:[20,26], sky:['#3a2c6e','#1a1440'], deco:'dunes', decoColor:'#2c2452', particles:'fireflies', twist:'none',   bright:false },
+    { key:'marsh',    name:'FOGGY MARSH', tier:2, unlockMile:3,  dur:[20,26], sky:['#9fb0a6','#6c7d74'], deco:'fog',   decoColor:'#5d6d63', particles:'mist',      twist:'lowvis', bright:false },
+    { key:'night',    name:'NIGHT',       tier:2, unlockMile:3,  dur:[20,26], sky:['#04102a','#0b2a4a'], deco:'none',  decoColor:'#0b2a4a', particles:'stars',     twist:'none',   bright:false },
+    { key:'rain',     name:'RAIN',        tier:2, unlockMile:3,  dur:[20,26], sky:['#5b6b78','#37505f'], deco:'none',  decoColor:'#37505f', particles:'rain',      twist:'none',   bright:false },
+    // ---- T3 (unlock 8mi) ----
+    { key:'sandstorm',name:'SANDSTORM',   tier:3, unlockMile:8,  dur:[14,20], sky:['#c79a4e','#8a6a2e'], deco:'fog',   decoColor:'#8a6a2e', particles:'dust',      twist:'wind',   bright:false },
+    { key:'mirage',   name:'HEAT MIRAGE', tier:3, unlockMile:8,  dur:[14,20], sky:['#fff0a0','#f2c24a'], deco:'flat',  decoColor:'#e8b84a', particles:'heat',      twist:'mirage', bright:true  },
+    { key:'thunder',  name:'THUNDERSTORM',tier:3, unlockMile:8,  dur:[14,20], sky:['#1a1f26','#0a0d12'], deco:'none',  decoColor:'#0a0d12', particles:'rain',      twist:'none',   bright:false },
+    { key:'ember',    name:'EMBER BADLANDS',tier:3,unlockMile:8, dur:[14,20], sky:['#5a0f0f','#2a0606'], deco:'mesa',  decoColor:'#3a0a0a', particles:'ash',       twist:'hotter', bright:false },
+    { key:'frost',    name:'FROSTPASS',   tier:3, unlockMile:8,  dur:[14,20], sky:['#cfe8ff','#9fc4e0'], deco:'mesa',  decoColor:'#bcd6e6', particles:'snow',      twist:'none',   bright:false },
+    // ---- T4 (unlock 15mi) ----
+    { key:'aurora',   name:'AURORA NIGHT',tier:4, unlockMile:15, dur:[16,22], sky:['#061026','#0a1f3a'], deco:'none',  decoColor:'#0a1f3a', particles:'aurora',    twist:'none',   bright:false },
+    { key:'farshore', name:'THE FAR SHORE',tier:4,unlockMile:15, dur:[16,22], sky:['#ffcba0','#5ad6c6'], deco:'sea',   decoColor:'#2aa89a', particles:'none',      twist:'none',   bright:false },
+    // ---- SPECIALS (not in the random pool) ----
+    { key:'oasis',    name:'OASIS',       tier:0, unlockMile:0,  dur:[8,12],  sky:['#bfffe9','#2ec9a8'], deco:'palms', decoColor:'#0f7a52', particles:'none',      twist:'none',   bright:false },
+    { key:'retro',    name:'??? GLITCH ???',tier:0,unlockMile:0, dur:[10,10], sky:['#1a0b2e','#3a0f4a'], deco:'none',  decoColor:'#3a0f4a', particles:'none',      twist:'none',   bright:false, retro:true },
   ];
-  let zoneIdx = 0;          // index within ZONES
-  let zoneCount = 0;        // total zones entered (for "ZONE n")
-  let lastZoneBoundary = 0; // elapsed time when current zone started
-  let retroAudio = false;   // drives chiptune in voice()
+  const ZBY = {}; ZONES.forEach(z => ZBY[z.key] = z);
+  const OASIS = ZBY.oasis, RETRO = ZBY.retro;
+  const NORMAL_ZONES = ZONES.filter(z => z.tier >= 1); // 19 randomly-picked zones
+
+  let curZoneObj = ZBY.midday;   // active zone
+  let prevZoneObj = ZBY.midday;  // zone we are cross-fading FROM
+  let recentKeys = [];           // last up-to-2 normal zone keys (exclusion list)
+  let zoneCount = 0;             // total zones entered this run
+  let zoneTimer = 0;             // seconds remaining in current zone
+  let oasisCadence = 4;          // next forced-oasis at this zoneCount
+  let retroAudio = false;        // drives chiptune in voice()
   // cross-fade tracking: current displayed sky lerps toward target
   let skyTop = [205,255,246], skyBot = [121,221,208];
   let skyTopTo = skyTop.slice(), skyBotTo = skyBot.slice();
   let xfadeT = 0;
+  // atmosphere particle pools
+  let atmo = [];                 // generic drifting particles (dust/fireflies/ash/snow/etc)
+  let lightningT = 0, lightningFlash = 0;
 
-  function hexToRgb(h){ const n = parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  function hexToRgb(h){ h = h.trim(); const n = parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
   function rgbStr(c){ return 'rgb(' + (c[0]|0) + ',' + (c[1]|0) + ',' + (c[2]|0) + ')'; }
+  function curZone() { return curZoneObj; }
 
-  function applyZoneFlags() {
-    const z = ZONES[zoneIdx];
-    retroAudio = z.retro;
-    document.getElementById('scanlines').classList.toggle('on', z.retro);
-    wrap.classList.toggle('retro', z.retro);
-    if (z.stars) initStars();
+  // ---- weighted next-zone selection ----
+  function tierWeights() {
+    if (miles < 3)  return { 1:70, 2:30, 3:0,  4:0  };
+    if (miles < 8)  return { 1:40, 2:45, 3:15, 4:0  };
+    if (miles < 15) return { 1:15, 2:35, 3:45, 4:5  };
+    return { 1:5, 2:20, 3:55, 4:20 };
+  }
+  function pickNextZone() {
+    const w = tierWeights();
+    const pool = NORMAL_ZONES.filter(z => z.unlockMile <= miles && recentKeys.indexOf(z.key) < 0);
+    let total = 0; const weighted = [];
+    for (const z of pool) { const ww = w[z.tier] || 0; if (ww > 0) { weighted.push([z, ww]); total += ww; } }
+    if (!weighted.length) return ZBY.midday;
+    let r = Math.random() * total;
+    for (const [z, ww] of weighted) { r -= ww; if (r <= 0) return z; }
+    return weighted[0][0];
   }
 
-  function enterZone(idx, announce) {
-    zoneIdx = ((idx % ZONES.length) + ZONES.length) % ZONES.length;
-    const z = ZONES[zoneIdx];
+  function applyZoneFlags() {
+    const z = curZoneObj;
+    retroAudio = !!z.retro;
+    document.getElementById('scanlines').classList.toggle('on', !!z.retro);
+    wrap.classList.toggle('retro', !!z.retro);
+    document.getElementById('hudShade').classList.toggle('on', !!z.bright);
+    if (z.particles === 'stars') initStars();
+    seedAtmo(z);
+  }
+
+  // seed/refresh the atmosphere particle pool for a zone (capped)
+  function seedAtmo(z) {
+    atmo = [];
+    const p = z.particles;
+    if (p === 'dust') {
+      const n = z.key === 'sandstorm' ? 70 : 34;
+      for (let i = 0; i < n; i++) atmo.push({ x:Math.random()*W, y:Math.random()*H, vx:-(20+Math.random()*40), vy:(Math.random()-.5)*10, r:1+Math.random()*2.2, a:0.2+Math.random()*0.3 });
+    } else if (p === 'fireflies') {
+      for (let i = 0; i < 22; i++) atmo.push({ x:Math.random()*W, y:H*0.3+Math.random()*H*0.6, ph:Math.random()*6.28, sp:0.6+Math.random()*1.2, r:1.4+Math.random()*1.6, dx:(Math.random()-.5)*12, dy:(Math.random()-.5)*12 });
+    } else if (p === 'ash') {
+      const n = 38;
+      for (let i = 0; i < n; i++) atmo.push({ x:Math.random()*W, y:Math.random()*H, vy:18+Math.random()*30, vx:(Math.random()-.5)*14, r:1+Math.random()*2, ph:Math.random()*6.28, ember:Math.random()<0.4 });
+    } else if (p === 'snow') {
+      const n = 50;
+      for (let i = 0; i < n; i++) atmo.push({ x:Math.random()*W, y:Math.random()*H, vy:30+Math.random()*40, ph:Math.random()*6.28, r:1.4+Math.random()*2.4 });
+    }
+  }
+
+  function enterZone(z, announce) {
+    prevZoneObj = curZoneObj;
+    curZoneObj = z;
     skyTopTo = hexToRgb(z.sky[0]);
     skyBotTo = hexToRgb(z.sky[1]);
     xfadeT = XFADE;
+    // random duration; deep runs move a bit faster
+    let dur = z.dur[0] + Math.random() * (z.dur[1] - z.dur[0]);
+    if (miles > 10) dur *= 0.88;
+    zoneTimer = dur;
     applyZoneFlags();
-    if (announce) {
-      zoneCount++;
-      flashTitle(z.name, 'ZONE ' + zoneCount);
-      SFX.zone();
+
+    const normal = z.tier >= 1;
+    if (normal) {
+      // narrowing cup on each normal zone
+      player.w = Math.max(BASE_W * 0.62, player.w * 0.95);
+    } else if (z.key === 'oasis') {
+      // lush breather: full cup, top-up, chime
+      player.w = BASE_W;
+      hydration = Math.min(1, hydration + 0.15);
+      SFX.golden(); SFX.zone();
       haptic('success');
     }
+
+    if (announce) {
+      zoneCount++;
+      if (z.key === 'oasis') flashTitle('OASIS', miles.toFixed(1) + ' mi');
+      else if (z.retro)      flashTitle('??? GLITCH ???');
+      else                   flashTitle(z.name, miles.toFixed(1) + ' mi');
+      if (!(z.key === 'oasis')) SFX.zone();
+      haptic('success');
+    }
+    if (normal) { recentKeys.push(z.key); if (recentKeys.length > 2) recentKeys.shift(); }
+  }
+
+  // choose what comes next when a zone's timer ends
+  function advanceZone() {
+    // retro ultra-rare glitch (independent)
+    if (Math.random() < 0.0015) { enterZone(RETRO, true); return; }
+    // forced oasis cadence
+    if (zoneCount >= oasisCadence) {
+      oasisCadence = zoneCount + 4 + Math.floor(Math.random() * 3); // every 4-6 zones
+      enterZone(OASIS, true);
+      return;
+    }
+    enterZone(pickNextZone(), true);
   }
 
   function updateZones(dt) {
@@ -543,13 +711,37 @@
       xfadeT = Math.max(0, xfadeT - dt);
     } else { skyTop = skyTopTo.slice(); skyBot = skyBotTo.slice(); }
 
-    if (elapsed - lastZoneBoundary >= ZONE_DUR) {
-      lastZoneBoundary += ZONE_DUR;
-      enterZone(zoneIdx + 1, true);
-    }
+    zoneTimer -= dt;
+    if (zoneTimer <= 0) advanceZone();
+
+    updateAtmo(dt);
   }
 
-  function curZone() { return ZONES[zoneIdx]; }
+  function updateAtmo(dt) {
+    const z = curZoneObj, p = z.particles;
+    for (const m of atmo) {
+      if (p === 'dust') {
+        m.x += m.vx * dt; m.y += m.vy * dt;
+        if (m.x < -5) { m.x = W + 5; m.y = Math.random() * H; }
+      } else if (p === 'fireflies') {
+        m.ph += m.sp * dt; m.x += m.dx * dt; m.y += m.dy * dt;
+        if (m.x < 0 || m.x > W) m.dx *= -1;
+        if (m.y < H * 0.25 || m.y > H) m.dy *= -1;
+      } else if (p === 'ash') {
+        m.y += m.vy * dt; m.x += m.vx * dt + Math.sin(m.ph + elapsed) * 6 * dt; m.ph += dt;
+        if (m.y > H + 5) { m.y = -5; m.x = Math.random() * W; }
+      } else if (p === 'snow') {
+        m.y += m.vy * dt; m.x += Math.sin(m.ph + elapsed * 0.6) * 14 * dt; m.ph += dt;
+        if (m.y > H + 5) { m.y = -5; m.x = Math.random() * W; }
+      }
+    }
+    // thunderstorm lightning flashes
+    if (z.key === 'thunder') {
+      lightningT -= dt;
+      if (lightningT <= 0) { lightningFlash = 0.9; lightningT = 2.5 + Math.random() * 4; SFX.thunder(); }
+    }
+    if (lightningFlash > 0) lightningFlash = Math.max(0, lightningFlash - dt * 3);
+  }
 
   function flashTitle(txt, subtxt) {
     const el = document.getElementById('eggTitle');
@@ -575,19 +767,27 @@
   function playerHomeY() { return H - 90; }
 
   function reset() {
-    score = 0; hydration = 0.82; combo = 1; comboTimer = 0;
+    score = 0; miles = 0; hydration = 0.82; combo = 1; comboTimer = 0;
     spawnTimer = 0; spawnGap = 0.85; elapsed = 0; shakeT = 0;
     drops = []; particles = []; floaters = [];
     cleanStreak = 0; lastComboTitle = 0; thunderTimer = 0;
-    rainDrops = [];
+    rainDrops = []; atmo = []; lightningT = 0; lightningFlash = 0;
     forceTimer = 0; forceField = false;
     shieldSpawnTimer = 28 + Math.random() * 12;
     revivedThisRun = false; invulnTimer = 0;
     heartSpawnTimer = 35 + Math.random() * 20;
-    zoneIdx = 0; zoneCount = 1; lastZoneBoundary = 0;
-    const z0 = ZONES[0];
+    // milestone / record flags
+    tierMileHit = {}; roundMileHit = 0; recordBroken = false;
+    // journey / zone state — start at MIDDAY (T1)
+    player.w = BASE_W;
+    recentKeys = []; zoneCount = 1; oasisCadence = 4;
+    const z0 = ZBY.midday;
+    curZoneObj = z0; prevZoneObj = z0;
     skyTop = hexToRgb(z0.sky[0]); skyBot = hexToRgb(z0.sky[1]);
     skyTopTo = skyTop.slice(); skyBotTo = skyBot.slice(); xfadeT = 0;
+    let dur = z0.dur[0] + Math.random() * (z0.dur[1] - z0.dur[0]);
+    zoneTimer = dur;
+    recentKeys.push(z0.key);
     applyZoneFlags();
     player.x = W / 2; player.y = playerHomeY(); player.vx = 0; player.tilt = 0; player.pop = 0;
   }
@@ -681,12 +881,19 @@
     const t = TYPES[key];
     const x = 30 + Math.random() * (W - 60);
     let vy = 120 + elapsed * 4 + Math.random() * 70;
-    drops.push({
+    const d = {
       key, t, x,
       y: -30,
       vy: vy,
       rot: Math.random() * 6, vr: (Math.random() - .5) * 3, wob: Math.random() * 6
-    });
+    };
+    // Sandstorm wind: give the drop a steady ±~40px/s horizontal drift
+    if (curZoneObj && curZoneObj.twist === 'wind') d.wind = (Math.random() < 0.5 ? -1 : 1) * (28 + Math.random() * 24);
+    // Heat Mirage: ~30% of normal good drops are shimmering decoys that fade away
+    if (curZoneObj && curZoneObj.twist === 'mirage' && !forceKey && t.good && !t.ion && Math.random() < 0.3) {
+      d.decoy = true; d.decoyT = 0.7 + Math.random() * 0.6;
+    }
+    drops.push(d);
   }
 
   function burst(x, y, colors, n) {
@@ -709,6 +916,12 @@
   function update(dt) {
     elapsed += dt;
     updateZones(dt);
+
+    // ---- MILES accrual (primary metric) ----
+    let pace = Math.min(0.25, 0.12 + miles * 0.006);
+    pace *= (1 + Math.min(0.4, (combo - 1) * 0.06)); // combo tailwind
+    miles += dt * pace;
+    checkMilestones();
 
     // power-up timer
     if (forceTimer > 0) { forceTimer = Math.max(0, forceTimer - dt); }
@@ -747,18 +960,32 @@
     // combo decay
     if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) { combo = 1; lastComboTitle = 0; } }
 
-    // drain over time (harder tuning)
-    hydration -= dt * (0.034 + elapsed * 0.0007);
+    // drain over time (harder tuning) — Ember Badlands runs 1.3× hotter
+    const drainMul = curZoneObj.twist === 'hotter' ? 1.3 : 1;
+    hydration -= dt * (0.034 + elapsed * 0.0007) * drainMul;
 
     // drops
     const px = player.x, py = player.y, pw = player.w;
     const rimY = py - player.h / 2;        // top rim (open mouth) of the cup
     const mouthHalf = pw * 0.42;           // tighter than pw/2 so side walls don't catch
+    const windDrift = curZoneObj.twist === 'wind' ? 40 : 0;
     for (let i = drops.length - 1; i >= 0; i--) {
       const d = drops[i];
       d.y += d.vy * dt;
+      if (d.wind) d.x += d.wind * dt;            // per-drop horizontal wind drift
+      else if (windDrift) d.x += windDrift * dt; // ambient zone wind
       d.rot += d.vr * dt;
       d.wob += dt * 4;
+
+      // mirage decoy: shimmer then vanish before reaching the cup (gives nothing)
+      if (d.decoy) {
+        d.decoyT -= dt;
+        if (d.decoyT <= 0 || d.y >= rimY - 6) {
+          burst(d.x, d.y, ['#fff0a0', '#f2c24a'], 6);
+          drops.splice(i, 1);
+          continue;
+        }
+      }
 
       // Force-field power-up: only active in the bottom ~40% of the screen.
       if (forceField && d.y > H * 0.6) {
@@ -784,17 +1011,22 @@
       if (d.y > H + 50 || d.y < -70) drops.splice(i, 1);
     }
 
-    // rain ambience driven by zone
+    // rain ambience driven by zone (Rain + Thunderstorm)
     const z = curZone();
-    if (z.rain) {
-      if (rainDrops.length < 90) for (let k = 0; k < 3; k++)
+    const isRain = z.particles === 'rain';
+    if (isRain) {
+      const cap = z.key === 'thunder' ? 130 : 90;
+      if (rainDrops.length < cap) for (let k = 0; k < 3; k++)
         rainDrops.push({ x: Math.random() * W, y: -10, v: 600 + Math.random() * 400, len: 10 + Math.random() * 14 });
-      thunderTimer -= dt;
-      if (thunderTimer <= 0) { SFX.thunder(); thunderTimer = 9 + Math.random() * 12; }
+      // Plain Rain keeps its periodic distant thunder; Thunderstorm handles its own in updateAtmo
+      if (z.key === 'rain') {
+        thunderTimer -= dt;
+        if (thunderTimer <= 0) { SFX.thunder(); thunderTimer = 9 + Math.random() * 12; }
+      }
     }
     for (let i = rainDrops.length - 1; i >= 0; i--) {
       const rdp = rainDrops[i]; rdp.y += rdp.v * dt;
-      if (rdp.y > H + 20 || !z.rain) rainDrops.splice(i, 1);
+      if (rdp.y > H + 20 || !isRain) rainDrops.splice(i, 1);
     }
 
     hydration = Math.max(0, Math.min(1, hydration));
@@ -929,21 +1161,25 @@
   function finalGameOver() {
     state = State.OVER;
     SFX.over();
-    gc('submit', { score: Math.round(score) });
-    const isBest = score > best;
-    if (isBest) { best = score; localStorage.setItem('ionrush_best', best); }
-    document.getElementById('finalScore').textContent = score.toLocaleString();
-    document.getElementById('bestScore').textContent = 'Best: ' + best.toLocaleString();
+    // Game Center: submit centi-miles
+    gc('submit', { score: Math.round(miles * 100) });
+    // keep an internal points best too (not displayed)
+    if (score > best) { best = score; localStorage.setItem('ionrush_best', best); }
+    const isBest = miles > bestMiles;
+    if (isBest) { bestMiles = miles; localStorage.setItem('ionrush_best_miles', bestMiles); }
+    document.getElementById('finalScore').textContent = miles.toFixed(1) + ' mi';
+    document.getElementById('bestScore').textContent = 'Best ' + bestMiles.toFixed(1) + ' mi';
     const msgs = [
       'The Dry takes everyone eventually.',
       'Remi made it further this time.',
-      'Every drop counts out here.',
+      'Every mile counts out here.',
       'So close to the next oasis.'
     ];
     document.getElementById('overMsg').textContent = msgs[Math.floor(elapsed) % msgs.length];
 
     const banner = document.getElementById('bestBanner');
-    if (isBest && score > 0) {
+    if (isBest && miles > 0) {
+      banner.textContent = 'NEW BEST — ' + miles.toFixed(1) + ' mi';
       banner.classList.add('show');
       // celebration burst + triumphant sound
       for (let k = 0; k < 60; k++) {
@@ -1014,6 +1250,7 @@
     ctx.save();
     ctx.translate(d.x, d.y);
     ctx.rotate(Math.sin(d.rot) * 0.2);
+    if (d.decoy) ctx.globalAlpha = 0.4 + 0.25 * Math.sin(elapsed * 12 + d.wob); // shimmering mirage
 
     if (t.heart) {
       const pulse = 1 + Math.sin(d.wob) * 0.05;
@@ -1083,6 +1320,104 @@
     ctx.restore();
   }
 
+  // ---- horizon silhouette per zone `deco` ----
+  function drawDeco(z) {
+    const hor = H * 0.72;
+    ctx.save();
+    ctx.fillStyle = z.decoColor;
+    if (z.deco === 'dunes') {
+      ctx.beginPath(); ctx.moveTo(0, H);
+      let x = -40;
+      while (x < W + 80) { const r = 70 + ((x * 7) % 60); ctx.arc(x, hor + 30, r, Math.PI, 0, false); x += r * 1.4; }
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    } else if (z.deco === 'mesa') {
+      let x = -20;
+      while (x < W + 40) {
+        const w = 60 + ((x * 13) % 70), h = 50 + ((x * 17) % 90);
+        ctx.fillRect(x, hor - h + 40, w, H - (hor - h + 40));
+        x += w + 18 + ((x * 5) % 30);
+      }
+    } else if (z.deco === 'cacti') {
+      ctx.fillRect(0, hor + 40, W, H - hor - 40); // ground
+      ctx.lineWidth = 0;
+      for (let i = 0; i < 6; i++) {
+        const cx = (i + 0.5) * (W / 6) + ((i * 31) % 22) - 11, base = hor + 44, hh = 40 + ((i * 23) % 36);
+        ctx.fillRect(cx - 5, base - hh, 10, hh);
+        ctx.fillRect(cx - 18, base - hh * 0.6, 8, 4); ctx.fillRect(cx - 18, base - hh * 0.6 - 16, 8, 18);
+        ctx.fillRect(cx + 10, base - hh * 0.75, 8, 4); ctx.fillRect(cx + 10, base - hh * 0.75 - 14, 8, 16);
+      }
+    } else if (z.deco === 'palms') {
+      ctx.fillRect(0, hor + 40, W, H - hor - 40); // lush ground
+      for (let i = 0; i < 4; i++) {
+        const cx = (i + 0.5) * (W / 4), base = hor + 44, hh = 70 + ((i * 29) % 30);
+        ctx.fillStyle = '#7a4a22'; ctx.fillRect(cx - 4, base - hh, 8, hh);
+        ctx.fillStyle = z.decoColor;
+        for (let f = 0; f < 5; f++) {
+          const a = -Math.PI / 2 + (f - 2) * 0.5;
+          ctx.beginPath(); ctx.moveTo(cx, base - hh);
+          ctx.quadraticCurveTo(cx + Math.cos(a) * 28, base - hh - 18, cx + Math.cos(a) * 46, base - hh + 6 + Math.sin(a) * 10);
+          ctx.lineWidth = 6; ctx.strokeStyle = z.decoColor; ctx.stroke();
+        }
+      }
+    } else if (z.deco === 'sea') {
+      const sg = ctx.createLinearGradient(0, hor + 20, 0, H);
+      sg.addColorStop(0, 'rgba(255,255,255,.4)'); sg.addColorStop(0.15, z.decoColor); sg.addColorStop(1, z.decoColor);
+      ctx.fillStyle = sg; ctx.fillRect(0, hor + 20, W, H - hor - 20);
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+      for (let r = 0; r < 4; r++) {
+        const yy = hor + 40 + r * 18;
+        ctx.beginPath();
+        for (let xx = 0; xx <= W; xx += 12) ctx.lineTo(xx, yy + Math.sin(xx * 0.05 + elapsed * 2 + r) * 3);
+        ctx.stroke();
+      }
+    } else if (z.deco === 'flat') {
+      ctx.fillRect(0, hor + 42, W, H - hor - 42);
+    }
+    // fog/none: skip silhouette
+    ctx.restore();
+  }
+
+  // ---- atmosphere particle layer per `particles` ----
+  function drawAtmo(z) {
+    const p = z.particles;
+    if (p === 'dust') {
+      ctx.fillStyle = '#e8d49a';
+      for (const m of atmo) { ctx.globalAlpha = m.a; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    } else if (p === 'fireflies') {
+      for (const m of atmo) {
+        const gl = 0.3 + 0.7 * Math.abs(Math.sin(m.ph));
+        ctx.globalAlpha = gl; ctx.fillStyle = '#fff4a0';
+        ctx.shadowColor = '#ffe060'; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    } else if (p === 'ash') {
+      for (const m of atmo) {
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = m.ember ? ('rgba(255,' + (90 + ((m.ph * 30) | 0) % 80) + ',40,0.9)') : 'rgba(60,40,40,0.8)';
+        if (m.ember) { ctx.shadowColor = '#ff5a1e'; ctx.shadowBlur = 8; }
+        ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      ctx.globalAlpha = 1;
+    } else if (p === 'snow') {
+      ctx.fillStyle = '#ffffff';
+      for (const m of atmo) { ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    } else if (p === 'heat') {
+      // subtle vertical shimmer bands
+      ctx.save(); ctx.globalAlpha = 0.06; ctx.fillStyle = '#fff';
+      for (let i = 0; i < 6; i++) {
+        const xx = (i / 6) * W + Math.sin(elapsed * 2 + i) * 8;
+        ctx.fillRect(xx, H * 0.4, W / 6 * 0.5, H * 0.5);
+      }
+      ctx.restore();
+    } else if (p === 'mist') {
+      ctx.fillStyle = 'rgba(220,228,222,.12)'; ctx.fillRect(0, H * 0.45, W, H * 0.55);
+    }
+  }
+
   function render() {
     ctx.clearRect(0, 0, W, H);
     let sx = 0, sy = 0;
@@ -1091,13 +1426,35 @@
     ctx.translate(sx, sy);
 
     const z = curZone();
+    const night = z.particles === 'stars' || z.particles === 'aurora';
     // base sky gradient (cross-faded rgb)
     const sky = ctx.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0, rgbStr(skyTop));
     sky.addColorStop(1, rgbStr(skyBot));
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
-    if (z.stars) {
+    // ---- aurora ribbons (deep night) ----
+    if (z.particles === 'aurora') {
+      ctx.save();
+      const cols = ['rgba(90,230,200,', 'rgba(120,160,255,', 'rgba(180,120,255,'];
+      for (let b = 0; b < 3; b++) {
+        ctx.beginPath();
+        const yBase = H * (0.18 + b * 0.09);
+        for (let xx = 0; xx <= W; xx += 16) {
+          const yy = yBase + Math.sin(xx * 0.012 + elapsed * 0.6 + b) * 26 + Math.sin(xx * 0.03 + elapsed) * 10;
+          if (xx === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+        }
+        ctx.lineTo(W, yBase + 70); ctx.lineTo(0, yBase + 70); ctx.closePath();
+        const ag = ctx.createLinearGradient(0, yBase - 30, 0, yBase + 70);
+        ag.addColorStop(0, cols[b] + '0)');
+        ag.addColorStop(0.5, cols[b] + (0.16 + 0.06 * Math.sin(elapsed + b)) + ')');
+        ag.addColorStop(1, cols[b] + '0)');
+        ctx.fillStyle = ag; ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    if (night) {
       for (const st of stars) {
         ctx.globalAlpha = 0.45 + 0.55 * Math.sin(elapsed * 2 + st.tw);
         ctx.fillStyle = '#fff';
@@ -1112,12 +1469,15 @@
       [[0.3, -0.2, 0.18], [-0.25, 0.15, 0.22], [0.12, 0.36, 0.14]].forEach(c => {
         ctx.beginPath(); ctx.arc(mx + c[0] * mr, my + c[1] * mr, c[2] * mr, 0, Math.PI * 2); ctx.fill();
       });
-    } else {
+    } else if (z.particles !== 'rain' && z.key !== 'thunder') {
       const bloom = ctx.createRadialGradient(W*0.5, H*0.2, 10, W*0.5, H*0.2, H*0.7);
       bloom.addColorStop(0, 'rgba(255,255,255,.5)');
       bloom.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = bloom; ctx.fillRect(0,0,W,H);
     }
+
+    drawDeco(z);
+    drawAtmo(z);
 
     for (const d of drops) drawDrop(d);
 
@@ -1129,11 +1489,23 @@
     ctx.globalAlpha = 1;
 
     // rain streaks (zone-driven)
-    if (z.rain && rainDrops.length) {
+    if (z.particles === 'rain' && rainDrops.length) {
       ctx.strokeStyle = 'rgba(200,230,255,.5)'; ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (const rdp of rainDrops) { ctx.moveTo(rdp.x, rdp.y); ctx.lineTo(rdp.x - 2, rdp.y + rdp.len); }
       ctx.stroke();
+    }
+
+    // ---- cosmetic atmosphere overlays ----
+    if (z.twist === 'lowvis' || z.deco === 'fog') {
+      ctx.fillStyle = 'rgba(200,205,200,.16)'; ctx.fillRect(0, 0, W, H);
+    }
+    if (z.bright || z.twist === 'glare') {
+      ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(0, 0, W, H);
+    }
+    if (z.key === 'thunder' && lightningFlash > 0) {
+      ctx.fillStyle = 'rgba(235,240,255,' + (lightningFlash * 0.55).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
     }
 
     if (forceField && state === State.PLAY) {
@@ -1198,7 +1570,7 @@
   }
 
   function syncHUD() {
-    HUD.score.innerHTML = score.toLocaleString() + '<small>SCORE' + (combo>1?' ×'+combo:'') + '</small>';
+    HUD.score.innerHTML = miles.toFixed(1) + ' mi<small>MILES' + (combo>1?' ×'+combo:'') + '</small>';
     HUD.meter.style.width = (hydration * 100).toFixed(1) + '%';
     HUD.meterWrap.classList.toggle('low', hydration < 0.28);
     updateHeartHUD();
@@ -1356,13 +1728,13 @@
 
     x.fillStyle = 'rgba(255,255,255,.8)';
     x.font = '700 44px -apple-system, sans-serif';
-    x.fillText('SCORE', S/2, 660);
+    x.fillText('THE CROSSING', S/2, 660);
     x.fillStyle = '#ffffff';
-    x.font = '900 200px -apple-system, sans-serif';
-    x.fillText(score.toLocaleString(), S/2, 830);
+    x.font = '900 180px -apple-system, sans-serif';
+    x.fillText(miles.toFixed(1) + ' mi', S/2, 830);
     x.fillStyle = '#aef6ee';
     x.font = '700 52px -apple-system, sans-serif';
-    x.fillText('Best: ' + best.toLocaleString(), S/2, 910);
+    x.fillText('Best ' + bestMiles.toFixed(1) + ' mi', S/2, 910);
     x.fillStyle = 'rgba(255,255,255,.85)';
     x.font = '600 italic 42px -apple-system, sans-serif';
     x.fillText('Keep Remi going through the Dry.', S/2, 1000);
@@ -1397,7 +1769,7 @@
     initAudio(); SFX.click();
     let dataURL;
     try { dataURL = buildShareCard(); } catch (e) { return; }
-    const text = 'I scored ' + score.toLocaleString() + ' in Ion Rush! 💧';
+    const text = 'I crossed ' + miles.toFixed(1) + ' mi of the Dry in Ion Rush! 💧';
     // (a) native bridge
     try {
       if (window.webkit?.messageHandlers?.share) {
@@ -1428,6 +1800,7 @@
   }
 
   updateSpeedBadge();
+
 })();
 </script>
 </body>
