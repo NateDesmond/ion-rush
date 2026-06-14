@@ -36,32 +36,82 @@
   }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
-  /* HUD */
+  /* HUD — top journey bar (MILES WALKED, Remi walking) */
   #hud {
     position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0;
-    display: flex; align-items: center; gap: 12px;
-    padding: 14px 18px; pointer-events: none;
+    padding: 14px 18px 0; pointer-events: none; z-index: 2;
   }
-  .logo {
-    font-family: var(--serif); font-weight: 600; letter-spacing: .5px;
-    font-size: 19px; color: var(--cream);
+  #journey {
+    /* leave room for the health gauge (left) and controls (right) */
+    margin: 0 96px 0 58px;
+  }
+  #milesReadout {
+    font-family: var(--serif); font-weight: 600; font-size: 22px; color: var(--cream);
+    text-align: center; line-height: 1; letter-spacing: .3px;
     text-shadow: 0 1px 6px rgba(0,0,0,.55);
   }
-  .logo span { color: var(--cream); opacity: .85; }
-  #hearts {
-    margin-left: auto; font-weight: 600; font-size: 14px; color: var(--cream);
-    text-shadow: 0 1px 5px rgba(0,0,0,.55); letter-spacing: .5px; white-space: nowrap; opacity: .9;
-  }
-  #hearts.hidden { display: none; }
-  #score {
-    font-family: var(--serif); font-weight: 600; font-size: 23px; color: var(--cream);
-    position: relative; z-index: 2; text-shadow: 0 1px 6px rgba(0,0,0,.55);
-  }
-  #score small {
+  #milesReadout span {
     font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    font-weight: 600; font-size: 10px; opacity: .65; display:block; text-align:right;
-    letter-spacing: 1.5px;
+    font-weight: 600; font-size: 11px; opacity: .6; letter-spacing: 1.5px;
   }
+  /* the slim trail Remi walks across */
+  #trail {
+    position: relative; height: 30px; margin-top: 9px;
+  }
+  #trailLine {
+    position: absolute; left: 0; right: 0; top: 22px; height: 2px; border-radius: 2px;
+    background: rgba(246,242,231,.40);
+    box-shadow: 0 1px 3px rgba(0,0,0,.35);
+    /* evenly-spaced footprint dots behind the walker */
+    background-image: radial-gradient(circle, rgba(246,242,231,.55) 1.2px, transparent 1.6px);
+    background-size: 22px 2px; background-position: 4px center; background-repeat: repeat-x;
+  }
+  #walker {
+    position: absolute; bottom: 4px; left: 0%;
+    transform: translateX(-50%);
+    transition: left .12s linear;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.45));
+  }
+  #walker.bob { animation: walkBob .5s ease-in-out infinite; }
+  @keyframes walkBob { 0%,100%{ transform: translateX(-50%) translateY(0); } 50%{ transform: translateX(-50%) translateY(-2px); } }
+  #walker.reset { transition: none; }
+  #walkerImg { width: 26px; height: 26px; object-fit: contain; display: block; }
+  /* footprint accent flashed on each whole-mile rollover */
+  #trail .step {
+    position: absolute; bottom: 2px; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--cream); opacity: .8; pointer-events: none;
+    animation: stepFade 1s ease-out forwards;
+  }
+  @keyframes stepFade { from{ opacity:.8; transform: scale(1);} to{ opacity:0; transform: scale(.4);} }
+
+  /* TOP-LEFT: hydration as a compact water "health" gauge */
+  #healthGauge {
+    position: absolute; z-index: 3; pointer-events: none;
+    top: calc(env(safe-area-inset-top, 0px) + 14px); left: 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  #healthTube {
+    width: 13px; height: 38px; border-radius: 7px;
+    background: rgba(246,242,231,.16);
+    border: 1px solid rgba(246,242,231,.40);
+    box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    overflow: hidden; position: relative;
+    display: flex; align-items: flex-end;
+  }
+  #healthFill {
+    width: 100%; height: 70%;
+    background: linear-gradient(180deg, #aef6ee, #16c2b3);
+    border-radius: 0 0 6px 6px;
+    transition: height .15s linear, background .3s linear;
+  }
+  #healthGauge.mid #healthFill { background: linear-gradient(180deg, #ffe39a, #f0a23c); }
+  #healthGauge.low #healthFill { background: linear-gradient(180deg, #ffb079, #ff5e52); }
+  #healthGauge.low { animation: hydPulse 1s ease-in-out infinite; }
+  @keyframes hydPulse { 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
+  #healthGlyph {
+    font-size: 11px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+  }
+
   /* darkening behind HUD on bright zones, keeps text legible */
   #hudShade {
     position: absolute; top: 0; left: 0; right: 0;
@@ -71,29 +121,16 @@
   }
   #hudShade.on { opacity: 1; }
 
-  /* Hydration meter — slim elegant bar */
-  #meterWrap {
-    position: absolute; top: calc(58px + env(safe-area-inset-top, 0px)); left: 18px; right: 18px;
-    height: 6px; border-radius: 4px; background: rgba(246,242,231,.16);
-    border: none; overflow: hidden; pointer-events: none;
-    box-shadow: 0 1px 4px rgba(0,0,0,.3);
-  }
-  #meterWrap::after {
-    content: 'HYDRATION'; position: absolute; right: 0; top: 9px;
-    font-size: 8px; letter-spacing: 1.5px; color: var(--cream); opacity: .55;
-    text-shadow: 0 1px 4px rgba(0,0,0,.5);
-  }
-  #meter {
-    height: 100%; width: 70%;
-    background: linear-gradient(90deg, rgba(246,242,231,.9), #74e3d6);
-    border-radius: 4px; transition: width .12s linear;
-  }
-  #meterWrap.low #meter { background: linear-gradient(90deg,#ffb079,#ff6a5e); }
-
   #controls {
-    position: absolute; top: calc(78px + env(safe-area-inset-top, 0px)); right: 14px; z-index: 7;
+    position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 14px; z-index: 7;
     display: flex; gap: 8px; align-items: center;
   }
+  #hearts {
+    font-weight: 600; font-size: 14px; color: var(--cream);
+    text-shadow: 0 1px 5px rgba(0,0,0,.55); letter-spacing: .5px; white-space: nowrap;
+    opacity: .9; pointer-events: none;
+  }
+  #hearts.hidden { display: none; }
   #controls button {
     -webkit-appearance: none; appearance: none;
     font-weight: 600; font-size: 13px; letter-spacing: .5px;
@@ -260,13 +297,26 @@
   <canvas id="game"></canvas>
 
   <div id="hudShade"></div>
-  <div id="hud">
-    <div class="logo">Ion<span> Rush</span></div>
-    <div id="hearts" class="hidden">❤ x0</div>
-    <div id="score">0.0<small>MILES</small></div>
+
+  <!-- TOP-LEFT: hydration as a compact water/health gauge -->
+  <div id="healthGauge" title="Hydration">
+    <div id="healthTube"><div id="healthFill"></div></div>
+    <div id="healthGlyph">💧</div>
   </div>
-  <div id="meterWrap"><div id="meter"></div></div>
+
+  <!-- TOP: MILES WALKED journey bar with Remi walking along it -->
+  <div id="hud">
+    <div id="journey">
+      <div id="milesReadout">0.0 <span>mi</span></div>
+      <div id="trail">
+        <div id="trailLine"></div>
+        <div id="walker"><img id="walkerImg" src="assets/remi_1.png" alt="" onerror="this.outerHTML='🥾'"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="controls">
+    <div id="hearts" class="hidden">❤ x0</div>
     <button id="speedBadge" title="Tap to change speed">1×</button>
     <button id="muteBtn" title="Mute / unmute">🔊</button>
   </div>
@@ -542,12 +592,16 @@
   const BASE_W = 78;             // un-narrowed cup width (stored once)
   const player = { x: 0, w: BASE_W, h: 58, y: 0, vx: 0, tilt: 0, pop: 0 };
   let cupVX = 0;                 // smoothed horizontal velocity (drives tilt)
+  let lastPlayerX = 0;           // player.x at end of previous frame (for velocity incl. touch-drag)
 
   const HUD = {
-    score: document.getElementById('score'),
-    meter: document.getElementById('meter'),
-    meterWrap: document.getElementById('meterWrap'),
+    milesReadout: document.getElementById('milesReadout'),
+    trail:        document.getElementById('trail'),
+    walker:       document.getElementById('walker'),
+    healthFill:   document.getElementById('healthFill'),
+    healthGauge:  document.getElementById('healthGauge'),
   };
+  let lastWholeMile = 0; // tracks whole-mile rollovers for the step accent + walker reset
   const startScreen = document.getElementById('startScreen');
   const overScreen = document.getElementById('overScreen');
 
@@ -863,7 +917,7 @@
   function playerHomeY() { return H - 90; }
 
   function reset() {
-    score = 0; miles = 0; hydration = 0.82; combo = 1; comboTimer = 0;
+    score = 0; miles = 0; hydration = 0.82; combo = 1; comboTimer = 0; lastWholeMile = 0;
     spawnTimer = 0; spawnGap = 0.85; elapsed = 0; shakeT = 0;
     drops = []; particles = []; floaters = [];
     cleanStreak = 0; lastComboTitle = 0; thunderTimer = 0;
@@ -886,7 +940,7 @@
     recentKeys.push(z0.key);
     applyZoneFlags();
     player.x = W / 2; player.y = playerHomeY(); player.vx = 0; player.tilt = 0; player.pop = 0;
-    cupVX = 0;
+    cupVX = 0; lastPlayerX = player.x;
     resetTelemetry();
   }
 
@@ -955,9 +1009,9 @@
 
   // ---- Drop types ----
   const TYPES = {
-    aqua: { good: true,  r: 18, hyd: 0.072, pts: 10, color: ['#aef6ee', '#16c2b3'] },
-    ion:    { good: true,  r: 13, hyd: 0.032, pts: 5,  color: ['#fff7a8', '#ffd400'], ion: true },
-    water:  { good: true,  r: 16, hyd: 0.050, pts: 6,  color: ['#e9fffb', '#74e3d6'] },
+    aqua: { good: true,  r: 18, hyd: 0.080, pts: 10, color: ['#aef6ee', '#16c2b3'] },
+    ion:    { good: true,  r: 13, hyd: 0.036, pts: 5,  color: ['#fff7a8', '#ffd400'], ion: true },
+    water:  { good: true,  r: 16, hyd: 0.056, pts: 6,  color: ['#e9fffb', '#74e3d6'] },
     soda:   { good: false, r: 17, hyd: -0.10, pts: 0, color: ['#ff9a7a', '#e23c3c'] },
     coffee: { good: false, r: 16, hyd: -0.08, pts: 0, color: ['#9c6f4e', '#3a2418'] },
     golden: { good: true,  r: 21, hyd: 0.18,  pts: 50, color: ['#fff3b0', '#ffb800'], golden: true },
@@ -1085,16 +1139,17 @@
     if (spawnTimer <= 0) { spawnDrop(); spawnTimer = spawnGap; if (Math.random() < 0.15 + elapsed*0.004) spawnDrop(); }
 
     // player movement (keyboard; drag updates player.x directly via events)
-    const prevX = player.x;
     let kv = 0;
     if (keyLeft) kv -= 1; if (keyRight) kv += 1;
     if (kv) { player.x += kv * 520 * dt; dragging = false; }
     player.x = Math.max(player.w/2, Math.min(W - player.w/2, player.x));
     // ---- cup leans into its direction of travel (velocity-driven tilt) ----
-    const instVX = dt > 0 ? (player.x - prevX) / dt : 0;
+    // Compare to LAST frame's x so touch-drag (which moves player.x between frames) is captured.
+    const instVX = dt > 0 ? (player.x - lastPlayerX) / dt : 0;
     cupVX += (instVX - cupVX) * Math.min(1, dt * 14);        // smooth the velocity
     const targetTilt = Math.max(-0.32, Math.min(0.32, cupVX * 0.0012));
     player.tilt += (targetTilt - player.tilt) * Math.min(1, dt * 12);
+    lastPlayerX = player.x;
     if (player.pop > 0) player.pop = Math.max(0, player.pop - dt * 4.5);
 
     // combo decay
@@ -1102,7 +1157,7 @@
 
     // drain over time (harder tuning) — Ember Badlands runs 1.3× hotter
     const drainMul = curZoneObj.twist === 'hotter' ? 1.3 : 1;
-    const drainAmt = dt * (0.034 + elapsed * 0.0007) * drainMul;
+    const drainAmt = dt * (0.034 + elapsed * 0.00065) * drainMul;
     hydration -= drainAmt;
     tele.hydLostPassive += drainAmt;
 
@@ -1115,7 +1170,7 @@
     // drops
     const px = player.x, py = player.y, pw = player.w;
     const rimY = py - player.h / 2;        // top rim (open mouth) of the cup
-    const mouthHalf = pw * 0.42;           // tighter than pw/2 so side walls don't catch
+    const mouthHalf = pw * 0.46;           // mouth ~92% of cup; thin walls still bounce edge-hits
     const windDrift = curZoneObj.twist === 'wind' ? 40 : 0;
     for (let i = drops.length - 1; i >= 0; i--) {
       const d = drops[i];
@@ -1167,7 +1222,8 @@
         if (d.y >= rimY && d.y <= py + player.h / 2 &&
             offset > mouthHalf && offset <= pw / 2 + d.t.r) {
           const dir = (d.x - px) >= 0 ? 1 : -1;
-          d.vx = dir * (200 + Math.random() * 60);          // kick outward horizontally
+          d.x = px + dir * (pw / 2 + d.t.r);                // resolve penetration: snap to OUTSIDE the wall (never overlap)
+          d.vx = dir * (230 + Math.random() * 70);          // kick outward horizontally
           d.vy = Math.max(40, d.vy * 0.5);                  // dampen vertical, keep falling
           d.bounced = true;
           tele.wallBounces++;
@@ -1781,9 +1837,35 @@
   }
 
   function syncHUD() {
-    HUD.score.innerHTML = miles.toFixed(1) + ' mi<small>MILES' + (combo>1?' ×'+combo:'') + '</small>';
-    HUD.meter.style.width = (hydration * 100).toFixed(1) + '%';
-    HUD.meterWrap.classList.toggle('low', hydration < 0.28);
+    // --- miles serif readout ---
+    HUD.milesReadout.innerHTML = miles.toFixed(1) + ' <span>mi' + (combo>1?' ×'+combo:'') + '</span>';
+
+    // --- Remi walks L→R across the bar over each mile, resets on rollover ---
+    const whole = Math.floor(miles);
+    if (whole > lastWholeMile) {
+      lastWholeMile = whole;
+      // jump the walker back to the start without easing across the bar
+      HUD.walker.classList.add('reset');
+      HUD.walker.style.left = '0%';
+      // force reflow so the next (eased) move animates from the left edge
+      void HUD.walker.offsetWidth;
+      HUD.walker.classList.remove('reset');
+      // subtle footprint accent at the right edge where the mile ticked over
+      const step = document.createElement('div');
+      step.className = 'step';
+      step.style.left = '99%';
+      HUD.trail.appendChild(step);
+      setTimeout(() => step.remove(), 1000);
+    }
+    const frac = miles - whole;
+    HUD.walker.style.left = (frac * 100).toFixed(2) + '%';
+    HUD.walker.classList.toggle('bob', state === State.PLAY);
+
+    // --- hydration as a water "health" gauge ---
+    HUD.healthFill.style.height = (hydration * 100).toFixed(1) + '%';
+    HUD.healthGauge.classList.toggle('low', hydration < 0.25);
+    HUD.healthGauge.classList.toggle('mid', hydration >= 0.25 && hydration < 0.5);
+
     updateHeartHUD();
   }
 
