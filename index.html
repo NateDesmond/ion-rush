@@ -36,14 +36,14 @@
   }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
-  /* HUD — top journey bar (MILES WALKED, Remi walking) */
+  /* HUD — top journey bar (MILES WALKED, Remi walking), full screen width */
   #hud {
     position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0;
-    padding: 14px 18px 0; pointer-events: none; z-index: 2;
+    padding: 10px 0 0; pointer-events: none; z-index: 2;
   }
   #journey {
-    /* leave room for the health gauge (left) and controls (right) */
-    margin: 0 96px 0 58px;
+    /* full width, edge to edge */
+    margin: 0;
   }
   #milesReadout {
     font-family: var(--serif); font-weight: 600; font-size: 22px; color: var(--cream);
@@ -54,12 +54,12 @@
     font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
     font-weight: 600; font-size: 11px; opacity: .6; letter-spacing: 1.5px;
   }
-  /* the slim trail Remi walks across */
+  /* the slim trail Remi walks across — spans full width */
   #trail {
-    position: relative; height: 30px; margin-top: 9px;
+    position: relative; height: 48px; margin-top: 8px;
   }
   #trailLine {
-    position: absolute; left: 0; right: 0; top: 22px; height: 2px; border-radius: 2px;
+    position: absolute; left: 0; right: 0; top: 38px; height: 2px; border-radius: 2px;
     background: rgba(246,242,231,.40);
     box-shadow: 0 1px 3px rgba(0,0,0,.35);
     /* evenly-spaced footprint dots behind the walker */
@@ -67,7 +67,7 @@
     background-size: 22px 2px; background-position: 4px center; background-repeat: repeat-x;
   }
   #walker {
-    position: absolute; bottom: 4px; left: 0%;
+    position: absolute; bottom: 8px; left: 0%;
     transform: translateX(-50%);
     transition: left .12s linear;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,.45));
@@ -75,42 +75,43 @@
   #walker.bob { animation: walkBob .5s ease-in-out infinite; }
   @keyframes walkBob { 0%,100%{ transform: translateX(-50%) translateY(0); } 50%{ transform: translateX(-50%) translateY(-2px); } }
   #walker.reset { transition: none; }
-  #walkerImg { width: 26px; height: 26px; object-fit: contain; display: block; }
-  /* footprint accent flashed on each whole-mile rollover */
+  #walkerImg { width: 52px; height: 52px; object-fit: contain; display: block; }
+  /* footprint accent flashed on each 10-mile rollover */
   #trail .step {
-    position: absolute; bottom: 2px; width: 4px; height: 4px; border-radius: 50%;
+    position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 50%;
     background: var(--cream); opacity: .8; pointer-events: none;
     animation: stepFade 1s ease-out forwards;
   }
   @keyframes stepFade { from{ opacity:.8; transform: scale(1);} to{ opacity:0; transform: scale(.4);} }
 
-  /* TOP-LEFT: hydration as a compact water "health" gauge */
-  #healthGauge {
+  /* hydration as a long horizontal bar below the journey bar */
+  #hydroBar {
     position: absolute; z-index: 3; pointer-events: none;
-    top: calc(env(safe-area-inset-top, 0px) + 14px); left: 16px;
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    top: calc(env(safe-area-inset-top, 0px) + 104px);   /* below the full-width walking bar + 52px Remi */
+    left: 7%; width: 72%;
+    display: flex; align-items: center; gap: 7px;
   }
-  #healthTube {
-    width: 13px; height: 38px; border-radius: 7px;
+  #hydroGlyph {
+    font-size: 14px; line-height: 1; flex: 0 0 auto;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+  }
+  #hydroTrack {
+    flex: 1 1 auto; height: 9px; border-radius: 6px;
     background: rgba(246,242,231,.16);
     border: 1px solid rgba(246,242,231,.40);
     box-shadow: 0 1px 4px rgba(0,0,0,.4);
     overflow: hidden; position: relative;
-    display: flex; align-items: flex-end;
   }
-  #healthFill {
-    width: 100%; height: 70%;
-    background: linear-gradient(180deg, #aef6ee, #16c2b3);
-    border-radius: 0 0 6px 6px;
-    transition: height .15s linear, background .3s linear;
+  #hydroFill {
+    height: 100%; width: 70%;
+    background: linear-gradient(90deg, #aef6ee, #16c2b3);
+    border-radius: 6px;
+    transition: width .15s linear, background .3s linear;
   }
-  #healthGauge.mid #healthFill { background: linear-gradient(180deg, #ffe39a, #f0a23c); }
-  #healthGauge.low #healthFill { background: linear-gradient(180deg, #ffb079, #ff5e52); }
-  #healthGauge.low { animation: hydPulse 1s ease-in-out infinite; }
+  #hydroBar.mid #hydroFill { background: linear-gradient(90deg, #ffe39a, #f0a23c); }
+  #hydroBar.low #hydroFill { background: linear-gradient(90deg, #ffb079, #ff5e52); }
+  #hydroBar.low { animation: hydPulse 1s ease-in-out infinite; }
   @keyframes hydPulse { 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
-  #healthGlyph {
-    font-size: 11px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
-  }
 
   /* darkening behind HUD on bright zones, keeps text legible */
   #hudShade {
@@ -122,8 +123,9 @@
   #hudShade.on { opacity: 1; }
 
   #controls {
-    position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 14px; z-index: 7;
-    display: flex; gap: 8px; align-items: center;
+    /* stacked vertically, top-right, below the full-width journey bar */
+    position: absolute; top: calc(100px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 7;
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
   }
   #hearts {
     font-weight: 600; font-size: 14px; color: var(--cream);
@@ -298,13 +300,7 @@
 
   <div id="hudShade"></div>
 
-  <!-- TOP-LEFT: hydration as a compact water/health gauge -->
-  <div id="healthGauge" title="Hydration">
-    <div id="healthTube"><div id="healthFill"></div></div>
-    <div id="healthGlyph">💧</div>
-  </div>
-
-  <!-- TOP: MILES WALKED journey bar with Remi walking along it -->
+  <!-- TOP: MILES WALKED journey bar with Remi walking along it (full width) -->
   <div id="hud">
     <div id="journey">
       <div id="milesReadout">0.0 <span>mi</span></div>
@@ -313,6 +309,12 @@
         <div id="walker"><img id="walkerImg" src="assets/remi_1.png" alt="" onerror="this.outerHTML='🥾'"></div>
       </div>
     </div>
+  </div>
+
+  <!-- hydration as a long horizontal bar below the journey bar -->
+  <div id="hydroBar" title="Hydration">
+    <div id="hydroGlyph">💧</div>
+    <div id="hydroTrack"><div id="hydroFill"></div></div>
   </div>
 
   <div id="controls">
@@ -598,10 +600,10 @@
     milesReadout: document.getElementById('milesReadout'),
     trail:        document.getElementById('trail'),
     walker:       document.getElementById('walker'),
-    healthFill:   document.getElementById('healthFill'),
-    healthGauge:  document.getElementById('healthGauge'),
+    hydroFill:    document.getElementById('hydroFill'),
+    hydroBar:     document.getElementById('hydroBar'),
   };
-  let lastWholeMile = 0; // tracks whole-mile rollovers for the step accent + walker reset
+  let lastWholeMile = 0; // tracks 10-mile rollovers for the step accent + walker reset
   const startScreen = document.getElementById('startScreen');
   const overScreen = document.getElementById('overScreen');
 
@@ -1387,8 +1389,9 @@
   }
 
   function gameOver() {
-    // Revive opportunity: out of water, has a heart, hasn't revived yet this run.
-    if (!revivedThisRun && hearts >= 1) {
+    // Revive opportunity: out of water with a heart banked. One heart per revive,
+    // and you can revive as many times as you have hearts (no per-run cap).
+    if (hearts >= 1) {
       showRevivePrompt();
       return;
     }
@@ -1405,9 +1408,9 @@
   }
 
   function doRevive() {
-    if (revivedThisRun || hearts < 1) return;
-    setHearts(hearts - 1);
-    revivedThisRun = true;
+    if (hearts < 1) return;
+    setHearts(hearts - 1);   // one heart per revive
+    revivedThisRun = true;   // tracked for telemetry only (no longer caps revives)
     tele.revives++;
     SFX.shield();
     haptic('success');
@@ -1840,31 +1843,31 @@
     // --- miles serif readout ---
     HUD.milesReadout.innerHTML = miles.toFixed(1) + ' <span>mi' + (combo>1?' ×'+combo:'') + '</span>';
 
-    // --- Remi walks L→R across the bar over each mile, resets on rollover ---
-    const whole = Math.floor(miles);
-    if (whole > lastWholeMile) {
-      lastWholeMile = whole;
+    // --- Remi walks L→R across the bar over each 10-mile span, resets on rollover ---
+    const span = Math.floor(miles / 10);
+    if (span > lastWholeMile) {
+      lastWholeMile = span;
       // jump the walker back to the start without easing across the bar
       HUD.walker.classList.add('reset');
       HUD.walker.style.left = '0%';
       // force reflow so the next (eased) move animates from the left edge
       void HUD.walker.offsetWidth;
       HUD.walker.classList.remove('reset');
-      // subtle footprint accent at the right edge where the mile ticked over
+      // subtle footprint accent at the right edge where the 10-mile span ticked over
       const step = document.createElement('div');
       step.className = 'step';
       step.style.left = '99%';
       HUD.trail.appendChild(step);
       setTimeout(() => step.remove(), 1000);
     }
-    const frac = miles - whole;
+    const frac = (miles % 10) / 10;
     HUD.walker.style.left = (frac * 100).toFixed(2) + '%';
     HUD.walker.classList.toggle('bob', state === State.PLAY);
 
-    // --- hydration as a water "health" gauge ---
-    HUD.healthFill.style.height = (hydration * 100).toFixed(1) + '%';
-    HUD.healthGauge.classList.toggle('low', hydration < 0.25);
-    HUD.healthGauge.classList.toggle('mid', hydration >= 0.25 && hydration < 0.5);
+    // --- hydration as a long horizontal bar ---
+    HUD.hydroFill.style.width = (hydration * 100).toFixed(1) + '%';
+    HUD.hydroBar.classList.toggle('low', hydration < 0.25);
+    HUD.hydroBar.classList.toggle('mid', hydration >= 0.25 && hydration < 0.5);
 
     updateHeartHUD();
   }
