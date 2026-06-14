@@ -31,7 +31,7 @@
 
   /* HUD */
   #hud {
-    position: absolute; top: 0; left: 0; right: 0;
+    position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0;
     display: flex; align-items: center; gap: 12px;
     padding: 14px 18px; pointer-events: none;
   }
@@ -51,7 +51,7 @@
 
   /* Hydration meter */
   #meterWrap {
-    position: absolute; top: 56px; left: 18px; right: 18px;
+    position: absolute; top: calc(56px + env(safe-area-inset-top, 0px)); left: 18px; right: 18px;
     height: 16px; border-radius: 10px; background: rgba(255,255,255,.55);
     border: 2px solid #fff; overflow: hidden; pointer-events: none;
     box-shadow: inset 0 1px 3px rgba(6,64,61,.15);
@@ -64,7 +64,7 @@
   #meterWrap.low #meter { background: linear-gradient(90deg,#ff7a59,#ff4d4d); }
 
   #controls {
-    position: absolute; top: 78px; right: 14px; z-index: 7;
+    position: absolute; top: calc(78px + env(safe-area-inset-top, 0px)); right: 14px; z-index: 7;
     display: flex; gap: 8px; align-items: center;
   }
   #controls button {
@@ -484,6 +484,7 @@
   // Force-field power-up timer (seconds remaining; >0 means active)
   let forceTimer = 0;
   const FORCE_DUR = 6;
+  const CATCH_BAND = 22; // vertical band below the cup rim that registers a catch
   let shieldSpawnTimer = 28 + Math.random() * 12; // first shield window
   let forceField = false; // derived from forceTimer each frame
 
@@ -574,7 +575,7 @@
   function playerHomeY() { return H - 90; }
 
   function reset() {
-    score = 0; hydration = 0.85; combo = 1; comboTimer = 0;
+    score = 0; hydration = 0.82; combo = 1; comboTimer = 0;
     spawnTimer = 0; spawnGap = 0.85; elapsed = 0; shakeT = 0;
     drops = []; particles = []; floaters = [];
     cleanStreak = 0; lastComboTitle = 0; thunderTimer = 0;
@@ -591,18 +592,41 @@
     player.x = W / 2; player.y = playerHomeY(); player.vx = 0; player.tilt = 0; player.pop = 0;
   }
 
-  // ---- Input ----
-  let targetX = null, keyLeft = false, keyRight = false;
-  function pointer(e) {
-    if (state !== State.PLAY) return;
-    const r = canvas.getBoundingClientRect();
-    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-    targetX = cx;
+  // ---- Input (relative drag, no teleport) ----
+  let keyLeft = false, keyRight = false;
+  let dragging = false, dragPointerStartX = 0, dragCupStartX = 0;
+  const GAIN = 1.7; // a short thumb swipe covers the whole width
+  function clientX(e) {
+    if (e.touches && e.touches.length) return e.touches[0].clientX;
+    if (e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientX;
+    return e.clientX;
   }
-  canvas.addEventListener('mousemove', pointer);
-  canvas.addEventListener('touchmove', e => { pointer(e); e.preventDefault(); }, { passive: false });
-  canvas.addEventListener('touchstart', e => { initAudio(); pointer(e); e.preventDefault(); }, { passive: false });
-  ['touchend', 'pointerdown', 'mousedown'].forEach(ev =>
+  function clampPlayerX(x) { return Math.max(player.w/2, Math.min(W - player.w/2, x)); }
+  function dragStart(e) {
+    if (state !== State.PLAY) return;
+    const x = clientX(e);
+    if (x == null || isNaN(x)) return;
+    dragging = true;
+    dragPointerStartX = x;
+    dragCupStartX = player.x;
+    // do NOT move the cup on touch-down
+  }
+  function dragMove(e) {
+    if (!dragging || state !== State.PLAY) return;
+    const x = clientX(e);
+    if (x == null || isNaN(x)) return;
+    player.x = clampPlayerX(dragCupStartX + (x - dragPointerStartX) * GAIN);
+  }
+  function dragEnd() { dragging = false; }
+  // mouse
+  canvas.addEventListener('mousedown', e => { initAudio(); dragStart(e); });
+  window.addEventListener('mousemove', dragMove);
+  window.addEventListener('mouseup', dragEnd);
+  // touch
+  canvas.addEventListener('touchstart', e => { initAudio(); dragStart(e); e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { dragMove(e); e.preventDefault(); }, { passive: false });
+  window.addEventListener('touchend', dragEnd);
+  ['pointerdown'].forEach(ev =>
     window.addEventListener(ev, () => initAudio(), { passive: true }));
   function setSpeed(idx) {
     speedIdx = (idx + SPEEDS.length) % SPEEDS.length;
@@ -633,11 +657,11 @@
 
   // ---- Drop types ----
   const TYPES = {
-    aqua: { good: true,  r: 18, hyd: 0.078, pts: 10, color: ['#aef6ee', '#16c2b3'] },
-    ion:    { good: true,  r: 13, hyd: 0.034, pts: 5,  color: ['#fff7a8', '#ffd400'], ion: true },
-    water:  { good: true,  r: 16, hyd: 0.054, pts: 6,  color: ['#e9fffb', '#74e3d6'] },
-    soda:   { good: false, r: 17, hyd: -0.09, pts: 0, color: ['#ff9a7a', '#e23c3c'] },
-    coffee: { good: false, r: 16, hyd: -0.07, pts: 0, color: ['#9c6f4e', '#3a2418'] },
+    aqua: { good: true,  r: 18, hyd: 0.072, pts: 10, color: ['#aef6ee', '#16c2b3'] },
+    ion:    { good: true,  r: 13, hyd: 0.032, pts: 5,  color: ['#fff7a8', '#ffd400'], ion: true },
+    water:  { good: true,  r: 16, hyd: 0.050, pts: 6,  color: ['#e9fffb', '#74e3d6'] },
+    soda:   { good: false, r: 17, hyd: -0.10, pts: 0, color: ['#ff9a7a', '#e23c3c'] },
+    coffee: { good: false, r: 16, hyd: -0.08, pts: 0, color: ['#9c6f4e', '#3a2418'] },
     golden: { good: true,  r: 21, hyd: 0.18,  pts: 50, color: ['#fff3b0', '#ffb800'], golden: true },
     shield: { good: true,  r: 19, hyd: 0.02,  pts: 5,  color: ['#bfe9ff', '#5aa9ff'], shield: true },
     heart:  { good: true,  r: 19, hyd: 0.01,  pts: 0,  color: ['#ffd0d6', '#ff3b5c'], heart: true },
@@ -712,23 +736,24 @@
     spawnTimer -= dt;
     if (spawnTimer <= 0) { spawnDrop(); spawnTimer = spawnGap; if (Math.random() < 0.15 + elapsed*0.004) spawnDrop(); }
 
-    // player movement
-    if (targetX != null) player.x += (targetX - player.x) * Math.min(1, dt * 14);
+    // player movement (keyboard; drag updates player.x directly via events)
     let kv = 0;
     if (keyLeft) kv -= 1; if (keyRight) kv += 1;
-    if (kv) { player.x += kv * 520 * dt; targetX = null; }
+    if (kv) { player.x += kv * 520 * dt; dragging = false; }
     player.x = Math.max(player.w/2, Math.min(W - player.w/2, player.x));
-    player.tilt += ((kv * 0.25 || (targetX!=null ? Math.max(-1,Math.min(1,(targetX-player.x)*0.02)):0)) - player.tilt) * Math.min(1, dt*8);
+    player.tilt += (kv * 0.25 - player.tilt) * Math.min(1, dt*8);
     if (player.pop > 0) player.pop = Math.max(0, player.pop - dt * 4.5);
 
     // combo decay
     if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) { combo = 1; lastComboTitle = 0; } }
 
-    // drain over time (unchanged tuning)
-    hydration -= dt * (0.032 + elapsed * 0.00055);
+    // drain over time (harder tuning)
+    hydration -= dt * (0.034 + elapsed * 0.0007);
 
     // drops
     const px = player.x, py = player.y, pw = player.w;
+    const rimY = py - player.h / 2;        // top rim (open mouth) of the cup
+    const mouthHalf = pw * 0.42;           // tighter than pw/2 so side walls don't catch
     for (let i = drops.length - 1; i >= 0; i--) {
       const d = drops[i];
       d.y += d.vy * dt;
@@ -738,15 +763,20 @@
       // Force-field power-up: only active in the bottom ~40% of the screen.
       if (forceField && d.y > H * 0.6) {
         if (d.t.good) {
-          d.x += (px - d.x) * Math.min(1, dt * 7);
-          d.y += (py - d.y) * Math.min(1, dt * 5);
+          // only attract good drops that are still ABOVE the catch rim; never yank
+          // a drop that has already fallen past back up.
+          if (d.y < rimY) {
+            d.x += (px - d.x) * Math.min(1, dt * 7);
+            d.y += (py - d.y) * Math.min(1, dt * 5);
+          }
         } else {
           d.x += (d.x < px ? -1 : 1) * 540 * dt;
         }
       }
 
-      // catch test (player cup mouth)
-      if (d.y > py - 30 && d.y < py + 20 && Math.abs(d.x - px) < pw/2 + d.t.r*0.4) {
+      // catch test: only when the drop crosses the cup's TOP RIM band and is
+      // within the mouth opening horizontally (sides don't catch).
+      if (d.y >= rimY && d.y <= rimY + CATCH_BAND && Math.abs(d.x - px) <= mouthHalf) {
         catchDrop(d);
         drops.splice(i, 1);
         continue;
@@ -847,7 +877,7 @@
         floatText(d.x, d.y - 10, 'SAFE', '#16c2b3');
         return;
       }
-      hydration += hydration < 0.30 ? t.hyd * 0.5 : t.hyd;
+      hydration += t.hyd; // full penalty always (no low-meter softening)
       combo = 1; comboTimer = 0; cleanStreak = 0; lastComboTitle = 0;
       score = Math.max(0, score - 4);
       burst(d.x, d.y, t.color, 14);
@@ -1120,13 +1150,25 @@
       ctx.strokeStyle = 'rgba(120,200,255,' + (0.45 + 0.2 * Math.sin(tt)) + ')';
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(player.x, player.y - 6, 72 + Math.sin(tt) * 4, 0, Math.PI * 2); ctx.stroke();
-      // countdown ring (depletes clockwise)
-      ctx.strokeStyle = 'rgba(180,220,255,.9)';
-      ctx.lineWidth = 4;
-      const frac = forceTimer / FORCE_DUR;
+
+      // ---- power-up countdown ring (teal, depletes full->empty) ----
+      const frac = Math.max(0, Math.min(1, forceTimer / FORCE_DUR));
+      const ringR = 94, ringCx = player.x, ringCy = player.y - 6;
+      const ending = forceTimer < 1; // last ~1s: tint/flash to red
+      const flash = ending ? (0.5 + 0.5 * Math.sin(elapsed * 26)) : 1;
+      // faint full-circle track
+      ctx.globalAlpha = fade * 0.22;
+      ctx.strokeStyle = '#16c2b3';
+      ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(ringCx, ringCy, ringR, 0, Math.PI * 2); ctx.stroke();
+      // remaining arc (depletes clockwise from the top)
+      ctx.globalAlpha = fade * (ending ? (0.55 + 0.45 * flash) : 1);
+      ctx.strokeStyle = ending ? '#ff5a4d' : '#16c2b3';
+      ctx.lineWidth = ending ? 6 : 5;
       ctx.beginPath();
-      ctx.arc(player.x, player.y - 6, 94, -Math.PI/2, -Math.PI/2 + frac * Math.PI * 2);
+      ctx.arc(ringCx, ringCy, ringR, -Math.PI/2, -Math.PI/2 + frac * Math.PI * 2);
       ctx.stroke();
+      ctx.lineCap = 'butt';
       ctx.restore();
     }
 
@@ -1255,7 +1297,7 @@
     overScreen.classList.add('hidden');
     document.getElementById('reviveScreen').classList.add('hidden');
     document.getElementById('bestBanner').classList.remove('show');
-    targetX = null; last = 0;
+    dragging = false; last = 0;
     state = State.PLAY;
     syncHUD();
     updateSpeedBadge();
