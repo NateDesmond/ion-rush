@@ -54,17 +54,37 @@
     font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
     font-weight: 600; font-size: 11px; opacity: .6; letter-spacing: 1.5px;
   }
-  /* the slim trail Remi walks across — spans full width */
+  /* the slim trail Remi walks across — spans full width, reads as a map route */
   #trail {
     position: relative; height: 48px; margin-top: 8px;
   }
+  /* AHEAD of Remi: a faint dashed/dotted "route to walk" (the full-width base line) */
   #trailLine {
     position: absolute; left: 0; right: 0; top: 38px; height: 2px; border-radius: 2px;
-    background: rgba(246,242,231,.40);
-    box-shadow: 0 1px 3px rgba(0,0,0,.35);
-    /* evenly-spaced footprint dots behind the walker */
-    background-image: radial-gradient(circle, rgba(246,242,231,.55) 1.2px, transparent 1.6px);
-    background-size: 22px 2px; background-position: 4px center; background-repeat: repeat-x;
+    background: transparent;
+    /* low-opacity cream dashes = map route still to be walked */
+    background-image: repeating-linear-gradient(90deg,
+      rgba(246,242,231,.30) 0px, rgba(246,242,231,.30) 5px,
+      transparent 5px, transparent 12px);
+  }
+  /* BEHIND Remi: a solid warmer cream/sand traveled path that fills up to the walker */
+  #trailDone {
+    position: absolute; left: 0; top: 37px; width: 0%; height: 4px; border-radius: 3px;
+    background: linear-gradient(90deg, rgba(231,196,106,.55), rgba(246,233,200,.92));
+    box-shadow: 0 1px 4px rgba(0,0,0,.30);
+    /* small footprint marks along the traveled path */
+    background-image:
+      radial-gradient(circle, rgba(120,86,40,.45) 1.3px, transparent 1.7px),
+      linear-gradient(90deg, rgba(231,196,106,.55), rgba(246,233,200,.92));
+    background-size: 18px 4px, 100% 100%;
+    background-position: 5px center, center;
+    background-repeat: repeat-x, no-repeat;
+    transition: width .12s linear;
+  }
+  /* tiny oasis/flag marker at the far (end) right of the route */
+  #trailFlag {
+    position: absolute; right: 6px; top: 30px; font-size: 13px; line-height: 1;
+    opacity: .8; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45));
   }
   #walker {
     position: absolute; bottom: 8px; left: 0%;
@@ -84,32 +104,34 @@
   }
   @keyframes stepFade { from{ opacity:.8; transform: scale(1);} to{ opacity:0; transform: scale(.4);} }
 
-  /* hydration as a long horizontal bar below the journey bar */
+  /* hydration as a VERTICAL meter on the LEFT, directly below the walking bar */
   #hydroBar {
     position: absolute; z-index: 3; pointer-events: none;
-    top: calc(env(safe-area-inset-top, 0px) + 104px);   /* below the full-width walking bar + 52px Remi */
-    left: 7%; width: 72%;
-    display: flex; align-items: center; gap: 7px;
+    top: calc(env(safe-area-inset-top, 0px) + 120px);   /* below the full-width walking bar + trail */
+    left: 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
   }
   #hydroGlyph {
     font-size: 14px; line-height: 1; flex: 0 0 auto;
     filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
   }
   #hydroTrack {
-    flex: 1 1 auto; height: 9px; border-radius: 6px;
+    width: 13px; height: 146px; border-radius: 8px;
     background: rgba(246,242,231,.16);
     border: 1px solid rgba(246,242,231,.40);
     box-shadow: 0 1px 4px rgba(0,0,0,.4);
     overflow: hidden; position: relative;
   }
+  /* fills from the BOTTOM UP */
   #hydroFill {
-    height: 100%; width: 70%;
-    background: linear-gradient(90deg, #aef6ee, #16c2b3);
-    border-radius: 6px;
-    transition: width .15s linear, background .3s linear;
+    position: absolute; left: 0; right: 0; bottom: 0;
+    width: 100%; height: 70%;
+    background: linear-gradient(180deg, #aef6ee, #16c2b3);
+    border-radius: 8px;
+    transition: height .15s linear, background .3s linear;
   }
-  #hydroBar.mid #hydroFill { background: linear-gradient(90deg, #ffe39a, #f0a23c); }
-  #hydroBar.low #hydroFill { background: linear-gradient(90deg, #ffb079, #ff5e52); }
+  #hydroBar.mid #hydroFill { background: linear-gradient(180deg, #ffe39a, #f0a23c); }
+  #hydroBar.low #hydroFill { background: linear-gradient(180deg, #ffb079, #ff5e52); }
   #hydroBar.low { animation: hydPulse 1s ease-in-out infinite; }
   @keyframes hydPulse { 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
 
@@ -145,6 +167,12 @@
     min-width: 44px; min-height: 36px; /* comfortable touch target */
   }
   #controls button:active { transform: scale(.9); }
+  /* speed badge: dark text on a solid cream pill so "1×/2×/3×" is readable over any zone */
+  #speedBadge {
+    color: #06403d; font-weight: 800;
+    background: rgba(246,242,231,.88);
+    border-color: rgba(6,64,61,.25);
+  }
   #speedBadge.boost {
     color: #06403d; background: rgba(231,196,106,.85);
     border-color: rgba(246,242,231,.5);
@@ -306,7 +334,9 @@
       <div id="milesReadout">0.0 <span>mi</span></div>
       <div id="trail">
         <div id="trailLine"></div>
-        <div id="walker"><img id="walkerImg" src="assets/remi_1.png" alt="" onerror="this.outerHTML='🥾'"></div>
+        <div id="trailDone"></div>
+        <div id="trailFlag">🚩</div>
+        <div id="walker"><img id="walkerImg" src="assets/remi_walk.png" alt="" onerror="this.outerHTML='🥾'"></div>
       </div>
     </div>
   </div>
@@ -382,8 +412,8 @@
       <div class="title">Out of Water</div>
       <div class="sub">Spend a heart to revive Remi and keep this run going.</div>
       <div id="reviveHearts" class="big-score">❤ x0</div>
-      <button id="reviveBtn">Use ❤ Revive</button>
-      <button id="endRunBtn" class="textbtn">Keep ❤</button>
+      <button id="reviveBtn">Use ❤ to Revive</button>
+      <button id="endRunBtn" class="textbtn">Keep ❤ &amp; End Run</button>
     </div>
   </div>
 
@@ -599,6 +629,7 @@
   const HUD = {
     milesReadout: document.getElementById('milesReadout'),
     trail:        document.getElementById('trail'),
+    trailDone:    document.getElementById('trailDone'),
     walker:       document.getElementById('walker'),
     hydroFill:    document.getElementById('hydroFill'),
     hydroBar:     document.getElementById('hydroBar'),
@@ -1210,7 +1241,12 @@
       // TOP-MOUTH CATCH takes priority: any drop entering the mouth opening
       // within the rim band is caught reliably, tested BEFORE any bounce logic.
       // (sides don't catch). A bounced drop has been deflected and can't be caught.
-      if (!d.bounced && d.y >= rimY && d.y <= rimY + CATCH_BAND && Math.abs(d.x - px) <= mouthHalf) {
+      const offX = Math.abs(d.x - px);
+      const inMouth = d.y >= rimY && d.y <= rimY + CATCH_BAND && offX <= mouthHalf;
+      // forgiving top-corner catch: the very top ~4px of the rim catches across the
+      // full cup width (corner clips count as a catch, not a bounce).
+      const inTopCorner = d.y >= rimY && d.y <= rimY + 4 && offX <= pw / 2 + 4;
+      if (!d.bounced && (inMouth || inTopCorner)) {
         catchDrop(d);
         drops.splice(i, 1);
         continue;
@@ -1381,7 +1417,7 @@
       combo = 1; comboTimer = 0; cleanStreak = 0; lastComboTitle = 0;
       score = Math.max(0, score - 4);
       burst(d.x, d.y, t.color, 14);
-      floatText(d.x, d.y - 10, '−drain', '#e23c3c');
+      floatText(d.x, d.y - 10, '−' + Math.round(-t.hyd * 100), '#e23c3c');
       shakeT = 0.25;
       SFX.bad();
       haptic('warning');
@@ -1861,11 +1897,14 @@
       setTimeout(() => step.remove(), 1000);
     }
     const frac = (miles % 10) / 10;
-    HUD.walker.style.left = (frac * 100).toFixed(2) + '%';
+    const pct = (frac * 100).toFixed(2);
+    HUD.walker.style.left = pct + '%';
     HUD.walker.classList.toggle('bob', state === State.PLAY);
+    // traveled (solid) path fills up to Remi's current position
+    HUD.trailDone.style.width = pct + '%';
 
-    // --- hydration as a long horizontal bar ---
-    HUD.hydroFill.style.width = (hydration * 100).toFixed(1) + '%';
+    // --- hydration as a vertical meter (fills bottom-up) ---
+    HUD.hydroFill.style.height = (hydration * 100).toFixed(1) + '%';
     HUD.hydroBar.classList.toggle('low', hydration < 0.25);
     HUD.hydroBar.classList.toggle('mid', hydration >= 0.25 && hydration < 0.5);
 
