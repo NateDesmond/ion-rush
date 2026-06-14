@@ -36,10 +36,10 @@
   }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
-  /* HUD — top journey bar (MILES WALKED, Remi walking), full screen width */
+  /* HUD — BOTTOM journey strip (MILES WALKED, Remi walking), full screen width */
   #hud {
-    position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0;
-    padding: 10px 0 0; pointer-events: none; z-index: 2;
+    position: absolute; bottom: env(safe-area-inset-bottom, 0px); left: 0; right: 0;
+    padding: 0 0 6px; pointer-events: none; z-index: 2;
   }
   #journey {
     /* full width, edge to edge */
@@ -108,7 +108,8 @@
   /* hydration as a VERTICAL meter on the LEFT, directly below the walking bar */
   #hydroBar {
     position: absolute; z-index: 3; pointer-events: none;
-    top: calc(env(safe-area-inset-top, 0px) + 120px);   /* below the full-width walking bar + trail */
+    /* walking bar now lives at the BOTTOM, so the hydration meter sits near the TOP-LEFT */
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
     left: 12px;
     display: flex; flex-direction: column; align-items: center; gap: 6px;
   }
@@ -146,8 +147,8 @@
   #hudShade.on { opacity: 1; }
 
   #controls {
-    /* stacked vertically, top-right, below the full-width journey bar */
-    position: absolute; top: calc(100px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 7;
+    /* stacked vertically, TOP-right (journey bar is now at the bottom) */
+    position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); right: 12px; z-index: 7;
     display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
   }
   #hearts {
@@ -264,9 +265,11 @@
     z-index: 8; pointer-events: none; text-align: center; opacity: 0;
     font-size: clamp(30px,8vw,54px); font-weight: 900; font-style: italic; letter-spacing: -1px;
     color: #fff; text-shadow: 0 3px 0 var(--ion-deep), 0 0 22px rgba(22,194,179,.8);
-    transition: opacity .25s, transform .25s;
+    /* slow fade-OUT so the banner lingers ~3× longer before it disappears */
+    transition: opacity .75s ease, transform .75s ease;
   }
-  #eggTitle.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  /* keep the snappy entrance animation when it appears */
+  #eggTitle.show { opacity: 1; transform: translate(-50%,-50%) scale(1); transition: opacity .25s, transform .25s; }
   #eggTitle small { display:block; font-size: .42em; letter-spacing: 1px; opacity: .85; margin-top: 4px; }
 
   /* Retro CRT scanlines */
@@ -436,7 +439,7 @@
 
   <div id="hudShade"></div>
 
-  <!-- TOP: MILES WALKED journey bar with Remi walking along it (full width) -->
+  <!-- BOTTOM: MILES WALKED journey bar with Remi walking along it (full width) -->
   <div id="hud">
     <div id="journey">
       <div id="milesReadout">0.0 <span>mi</span></div>
@@ -1077,7 +1080,7 @@
     el.innerHTML = txt + (subtxt ? '<small>' + subtxt + '</small>' : '');
     el.classList.add('show');
     clearTimeout(flashTitle._t);
-    flashTitle._t = setTimeout(() => el.classList.remove('show'), subtxt ? 1100 : 900);
+    flashTitle._t = setTimeout(() => el.classList.remove('show'), subtxt ? 3300 : 2700);
   }
 
   function initStars() {
@@ -1093,7 +1096,8 @@
     haptic('success');
   }
 
-  function playerHomeY() { return H - 90; }
+  /* raised ~45px (H-90 → H-135) to clear the new bottom walking strip and ease thumb reach */
+  function playerHomeY() { return H - 135; }
 
   function reset() {
     score = 0; miles = 0; hydration = 0.82; combo = 1; comboTimer = 0; lastWholeMile = 0;
@@ -1583,6 +1587,7 @@
 
   function showRevivePrompt() {
     state = State.OVER;
+    shakeT = 0; // calm the background behind the prompt
     SFX.over();
     haptic('warning');
     document.getElementById('reviveHearts').textContent = '❤ x' + hearts;
@@ -1613,6 +1618,7 @@
 
   function finalGameOver() {
     state = State.OVER;
+    shakeT = 0; // calm the background behind the game-over panel
     SFX.over();
     // Game Center: submit centi-miles
     gc('submit', { score: Math.round(miles * 100) });
@@ -1994,7 +2000,8 @@
   function render() {
     ctx.clearRect(0, 0, W, H);
     let sx = 0, sy = 0;
-    if (shakeT > 0) { sx = (Math.random()-.5)*10*shakeT*4; sy = (Math.random()-.5)*10*shakeT*4; }
+    // never shake the background once a run has ended (game-over / revive / oasis screens)
+    if (shakeT > 0 && state === State.PLAY) { sx = (Math.random()-.5)*10*shakeT*4; sy = (Math.random()-.5)*10*shakeT*4; }
     ctx.save();
     ctx.translate(sx, sy);
 
@@ -2308,58 +2315,132 @@
   document.getElementById('lbOverBtn').addEventListener('click', () => { initAudio(); SFX.click(); gc('show'); });
 
   // ---- Share score card ----
-  const shareImg = new Image();
-  let shareImgLoaded = false;
-  shareImg.onload = () => { shareImgLoaded = true; };
-  shareImg.onerror = () => { shareImgLoaded = false; };
-  shareImg.src = REMI_HAPPY;
+  // The celebratory Remi (arms raised) for the share card. We load it lazily and
+  // AWAIT the load before drawing, so the card is never blank.
+  const REMI_EXCITED = 'assets/remi_excited.png';
+  let _remiExcited = null;
+  function loadRemiExcited() {
+    if (_remiExcited) return _remiExcited;
+    _remiExcited = new Promise((resolve) => {
+      const im = new Image();
+      im.onload = () => resolve(im.naturalWidth ? im : null);
+      im.onerror = () => resolve(null);
+      im.src = REMI_EXCITED;
+    });
+    return _remiExcited;
+  }
 
-  function buildShareCard() {
-    const S = 1080;
+  function roundRectPath(x, X, Y, w, h, r) {
+    x.beginPath();
+    x.moveTo(X + r, Y);
+    x.arcTo(X + w, Y, X + w, Y + h, r);
+    x.arcTo(X + w, Y + h, X, Y + h, r);
+    x.arcTo(X, Y + h, X, Y, r);
+    x.arcTo(X, Y, X + w, Y, r);
+    x.closePath();
+  }
+
+  // Render the share-worthy card to an offscreen canvas → PNG data URL.
+  // 1080×1350 portrait, premium teal→cream desert/oasis gradient.
+  async function buildShareCard() {
+    const SERIF = 'ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif';
+    const W0 = 1080, H0 = 1350;
+    const remi = await loadRemiExcited();
     const c = document.createElement('canvas');
-    c.width = S; c.height = S;
+    c.width = W0; c.height = H0;
     const x = c.getContext('2d');
-    const bg = x.createLinearGradient(0, 0, S, S);
-    bg.addColorStop(0, '#18d6c6');
-    bg.addColorStop(0.6, '#0a8f86');
-    bg.addColorStop(1, '#06403d');
-    x.fillStyle = bg; x.fillRect(0, 0, S, S);
-    const bloom = x.createRadialGradient(S*0.5, S*0.32, 20, S*0.5, S*0.32, S*0.6);
-    bloom.addColorStop(0, 'rgba(255,255,255,.22)');
+
+    // --- premium teal → cream desert/oasis gradient ---
+    const bg = x.createLinearGradient(0, 0, 0, H0);
+    bg.addColorStop(0.00, '#0a8f86');
+    bg.addColorStop(0.42, '#16c2b3');
+    bg.addColorStop(0.72, '#7fd8c0');
+    bg.addColorStop(1.00, '#F6F2E7'); // cream desert sand
+    x.fillStyle = bg; x.fillRect(0, 0, W0, H0);
+    // soft sun bloom up top
+    const bloom = x.createRadialGradient(W0*0.5, H0*0.24, 20, W0*0.5, H0*0.24, H0*0.5);
+    bloom.addColorStop(0, 'rgba(255,255,255,.30)');
     bloom.addColorStop(1, 'rgba(255,255,255,0)');
-    x.fillStyle = bloom; x.fillRect(0, 0, S, S);
+    x.fillStyle = bloom; x.fillRect(0, 0, W0, H0);
+    // dune silhouette riding the cream band
+    x.save();
+    x.fillStyle = 'rgba(231,196,106,.55)';
+    x.beginPath(); x.moveTo(0, H0);
+    let dx = -40;
+    while (dx < W0 + 80) { const dr = 120 + ((dx * 7) % 70); x.arc(dx, H0 - 150, dr, Math.PI, 0, false); dx += dr * 1.5; }
+    x.lineTo(W0, H0); x.closePath(); x.fill();
+    x.restore();
 
     x.textAlign = 'center';
-    x.fillStyle = '#e9fffb';
-    x.font = '900 italic 96px -apple-system, sans-serif';
-    x.fillText('ION RUSH', S/2, 180);
 
-    if (shareImgLoaded) {
-      try { x.drawImage(shareImg, S/2 - 160, 230, 320, 320); } catch (e) { drawCardDrop(x, S/2, 390, 150); }
+    // --- ION RUSH wordmark (top) ---
+    x.fillStyle = 'rgba(246,242,231,.92)';
+    x.font = '600 46px ' + SERIF;
+    x.save();
+    x.shadowColor = 'rgba(0,0,0,.30)'; x.shadowBlur = 10; x.shadowOffsetY = 2;
+    x.fillText('I O N   R U S H', W0/2, 116);
+    x.restore();
+
+    // --- celebratory Remi, drawn large ---
+    if (remi) {
+      const rw = 560, rh = rw * (remi.naturalHeight / remi.naturalWidth || 1);
+      try {
+        x.save();
+        x.shadowColor = 'rgba(0,0,0,.28)'; x.shadowBlur = 34; x.shadowOffsetY = 16;
+        x.drawImage(remi, W0/2 - rw/2, 150, rw, rh);
+        x.restore();
+      } catch (e) { drawCardDrop(x, W0/2, 430, 170); }
     } else {
-      drawCardDrop(x, S/2, 390, 150);
+      drawCardDrop(x, W0/2, 430, 170);
     }
 
-    x.fillStyle = 'rgba(255,255,255,.8)';
-    x.font = '700 44px -apple-system, sans-serif';
-    x.fillText('THE CROSSING', S/2, 660);
-    x.fillStyle = '#ffffff';
-    x.font = '900 180px -apple-system, sans-serif';
-    x.fillText(miles.toFixed(1) + ' mi', S/2, 830);
-    x.fillStyle = '#aef6ee';
-    x.font = '700 52px -apple-system, sans-serif';
-    x.fillText('Best ' + bestMiles.toFixed(1) + ' mi', S/2, 910);
-    x.fillStyle = 'rgba(255,255,255,.85)';
-    x.font = '600 italic 42px -apple-system, sans-serif';
-    x.fillText('Keep Remi going through the Dry.', S/2, 1000);
+    // --- big serif DISTANCE headline ---
+    x.save();
+    x.shadowColor = 'rgba(0,0,0,.32)'; x.shadowBlur = 14; x.shadowOffsetY = 4;
+    x.fillStyle = '#F6F2E7';
+    x.font = '600 188px ' + SERIF;
+    x.fillText(miles.toFixed(1), W0/2 - 30, 860);
+    x.font = '600 70px ' + SERIF;
+    x.fillStyle = 'rgba(246,242,231,.85)';
+    x.fillText('miles', W0/2 + 0, 940);
+    x.restore();
+
+    // --- "I carried the seed N mi" line ---
+    x.fillStyle = '#06403d';
+    x.font = '600 italic 44px ' + SERIF;
+    x.fillText('I carried the seed ' + miles.toFixed(1) + ' mi', W0/2, 1030);
+
+    // --- oases revived pill ---
+    const oases = seedsThisRun;
+    const pillTxt = '🌴 ' + oases + ' oas' + (oases === 1 ? 'is' : 'es') + ' revived';
+    x.font = '600 42px ' + SERIF;
+    const pw = x.measureText(pillTxt).width + 80;
+    const px = W0/2 - pw/2, py = 1075, ph = 78;
+    x.save();
+    roundRectPath(x, px, py, pw, ph, ph/2);
+    x.fillStyle = 'rgba(6,64,61,.16)';
+    x.fill();
+    x.lineWidth = 2; x.strokeStyle = 'rgba(6,64,61,.30)'; x.stroke();
+    x.restore();
+    x.fillStyle = '#06403d';
+    x.textBaseline = 'middle';
+    x.fillText(pillTxt, W0/2, py + ph/2 + 2);
+    x.textBaseline = 'alphabetic';
+
+    // --- evocative tagline ---
+    x.fillStyle = 'rgba(6,64,61,.78)';
+    x.font = '600 italic 40px ' + SERIF;
+    x.fillText('The Last Seed lives on.', W0/2, 1255);
 
     return c.toDataURL('image/png');
   }
+
+  // fallback drop glyph if the Remi image is unavailable
   function drawCardDrop(x, cx, cy, r) {
     x.save();
     x.translate(cx, cy);
     const g = x.createRadialGradient(-r*0.3, -r*0.4, 4, 0, 0, r*1.4);
-    g.addColorStop(0, '#aef6ee'); g.addColorStop(1, '#16c2b3');
+    g.addColorStop(0, '#e9fffb'); g.addColorStop(1, '#F6F2E7');
     x.fillStyle = g;
     x.beginPath();
     x.moveTo(0, -r*1.5);
@@ -2382,16 +2463,18 @@
   async function shareScore() {
     initAudio(); SFX.click();
     let dataURL;
-    try { dataURL = buildShareCard(); } catch (e) { return; }
-    const text = 'I crossed ' + miles.toFixed(1) + ' mi of the Dry in Ion Rush! 💧';
-    // (a) native bridge
+    try { dataURL = await buildShareCard(); } catch (e) { return; }
+    const oases = seedsThisRun;
+    const text = 'I carried the seed ' + miles.toFixed(1) + ' mi and revived ' +
+      oases + ' oas' + (oases === 1 ? 'is' : 'es') + ' in Ion Rush! 🌱';
+    // (a) native iOS share sheet (the path that matters)
     try {
       if (window.webkit?.messageHandlers?.share) {
         window.webkit.messageHandlers.share.postMessage({ image: dataURL, text });
         return;
       }
     } catch (e) {}
-    // (b) Web Share with file
+    // (b) Web Share with the PNG file
     try {
       const file = dataURLtoFile(dataURL, 'ionrush.png');
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
